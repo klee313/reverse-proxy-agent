@@ -1,0 +1,36 @@
+# GoReleaser config for building and publishing rpa binaries.
+version: 2
+
+project_name: rpa
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: rpa
+    main: ./cmd/rpa
+    binary: rpa
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: rpa
+    format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+
+checksum:
+  name_template: "checksums.txt"
+
+release:
+  draft: false
+  prerelease: auto
