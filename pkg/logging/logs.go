@@ -4,12 +4,14 @@
 package logging
 
 import (
-	"encoding/json"
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
-	"time"
+
+	"github.com/rs/zerolog"
 
 	"reverse-proxy-agent/pkg/config"
 )
@@ -48,9 +50,10 @@ func (r *LogBuffer) List() []string {
 }
 
 type Logger struct {
-	path string
-	ring *LogBuffer
-	mu   sync.Mutex
+	path  string
+	ring  *LogBuffer
+	mu    sync.Mutex
+	level zerolog.Level
 }
 
 func NewLogger(cfg *config.Config, ring *LogBuffer) (*Logger, error) {
@@ -58,54 +61,78 @@ func NewLogger(cfg *config.Config, ring *LogBuffer) (*Logger, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewLoggerWithPath(path, ring)
+	logger, err := NewLoggerWithPath(path, ring)
+	if err != nil {
+		return nil, err
+	}
+	logger.SetLevel(cfg.Logging.Level)
+	return logger, nil
 }
 
 func NewLoggerWithPath(path string, ring *LogBuffer) (*Logger, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, fmt.Errorf("create log dir: %w", err)
 	}
-	return &Logger{path: path, ring: ring}, nil
+	return &Logger{path: path, ring: ring, level: zerolog.InfoLevel}, nil
 }
 
 func (l *Logger) Info(format string, args ...any) {
-	l.write("INFO", "message", fmt.Sprintf(format, args...), nil)
+	l.Event("INFO", "message", map[string]any{
+		"msg": fmt.Sprintf(format, args...),
+	})
 }
 
 func (l *Logger) Error(format string, args ...any) {
-	l.write("ERROR", "message", fmt.Sprintf(format, args...), nil)
+	l.Event("ERROR", "message", map[string]any{
+		"msg": fmt.Sprintf(format, args...),
+	})
 }
 
 func (l *Logger) Event(level, event string, fields map[string]any) {
-	l.write(level, event, "", fields)
-}
-
-func (l *Logger) write(level, event, msg string, fields map[string]any) {
-	entry := map[string]any{
-		"ts":    time.Now().Format(time.RFC3339),
-		"level": level,
-		"event": event,
-	}
-	if msg != "" {
-		entry["msg"] = msg
-	}
-	for k, v := range fields {
-		entry[k] = v
-	}
-	encoded, err := json.Marshal(entry)
-	if err != nil {
-		encoded = []byte(fmt.Sprintf("{\"ts\":\"%s\",\"level\":\"%s\",\"event\":\"logger_error\",\"msg\":\"%s\"}",
-			time.Now().Format(time.RFC3339), level, "json marshal failed"))
-	}
-	line := string(encoded)
-	l.ring.Add(line)
-
 	l.mu.Lock()
 	defer l.mu.Unlock()
+
 	f, err := os.OpenFile(l.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return
 	}
 	defer f.Close()
-	_, _ = f.WriteString(line + "\n")
+
+	var buf bytes.Buffer
+	writer := zerolog.New(&buf).With().Timestamp().Logger().Level(l.level)
+	ev := writer.WithLevel(parseLevel(level)).Str("event", event)
+	for k, v := range fields {
+		ev = ev.Interface(k, v)
+	}
+	ev.Send()
+
+	line := strings.TrimSpace(buf.String())
+	if line == "" {
+		return
+	}
+	if _, err := f.WriteString(line + "\n"); err != nil {
+		return
+	}
+	if l.ring != nil {
+		l.ring.Add(line)
+	}
+}
+
+func parseLevel(level string) zerolog.Level {
+	switch strings.ToLower(level) {
+	case "debug":
+		return zerolog.DebugLevel
+	case "info":
+		return zerolog.InfoLevel
+	case "warn", "warning":
+		return zerolog.WarnLevel
+	case "error":
+		return zerolog.ErrorLevel
+	default:
+		return zerolog.InfoLevel
+	}
+}
+
+func (l *Logger) SetLevel(level string) {
+	l.level = parseLevel(level)
 }

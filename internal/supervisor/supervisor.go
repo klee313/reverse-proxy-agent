@@ -59,6 +59,8 @@ type Runner struct {
 	lastTriggerReason string
 }
 
+const successGracePeriod = 2 * time.Second
+
 func New(policy restart.Policy, backoff *restart.Backoff) *Runner {
 	return &Runner{
 		sm:      state.NewStateMachine(),
@@ -102,7 +104,6 @@ func (r *Runner) Start(build func() (*exec.Cmd, error)) error {
 	r.mu.Lock()
 	r.cmd = cmd
 	r.errLines = sshutil.NewLineBuffer(10)
-	r.lastSuccess = time.Now()
 	r.mu.Unlock()
 
 	go drain(stdout, nil)
@@ -112,6 +113,7 @@ func (r *Runner) Start(build func() (*exec.Cmd, error)) error {
 		return err
 	}
 	r.recordStartSuccess()
+	r.scheduleSuccessMark(cmd)
 	return nil
 }
 
@@ -496,6 +498,18 @@ func (r *Runner) recordExit(reason string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.lastExit = reason
+}
+
+func (r *Runner) scheduleSuccessMark(cmd *exec.Cmd) {
+	go func() {
+		time.Sleep(successGracePeriod)
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		if r.cmd != cmd || r.sm.State() != state.StateConnected {
+			return
+		}
+		r.lastSuccess = time.Now()
+	}()
 }
 
 func (r *Runner) setLastClass(class string) {

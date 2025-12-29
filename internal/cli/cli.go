@@ -829,6 +829,7 @@ func runForegroundClient(cfg *config.Config, label string) int {
 		fmt.Fprintf(os.Stderr, "logger init failed: %v\n", err)
 		return exitError
 	}
+	logger.SetLevel(cfg.ClientLogging.Level)
 
 	server, err := clientipcserver.NewServer(cfg, cli, logs)
 	if err != nil {

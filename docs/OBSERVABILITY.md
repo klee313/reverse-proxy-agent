@@ -1,6 +1,7 @@
 ## Observability
 
 This document describes the log and metrics schema exposed by rpa.
+Success grace period: 2 seconds (used before marking `last_success_unix`).
 
 ### Logs (JSON lines)
 
@@ -43,7 +44,7 @@ Example:
 - `last_exit`: last exit description
 - `last_class`: exit classification
 - `last_trigger`: last restart trigger reason
-- `last_success_unix`: unix timestamp of last success (optional)
+- `last_success_unix`: unix timestamp of the last SSH session that stayed up past the success grace period (optional)
 - `backoff_ms`: current backoff (optional)
 
 `rpa client status` returns:
@@ -55,7 +56,7 @@ Example:
 - `last_exit`: last exit description
 - `last_class`: exit classification
 - `last_trigger`: last restart trigger reason
-- `last_success_unix`: unix timestamp of last success (optional)
+- `last_success_unix`: unix timestamp of the last SSH session that stayed up past the success grace period (optional)
 - `backoff_ms`: current backoff (optional)
 
 ### Metrics keys
@@ -69,7 +70,7 @@ Example:
 - `rpa_agent_exit_success_total`
 - `rpa_agent_exit_failure_total`
 - `rpa_agent_last_trigger`
-- `rpa_agent_last_success_unix` (optional)
+- `rpa_agent_last_success_unix` (optional, set after the success grace period)
 - `rpa_agent_backoff_ms` (optional)
 
 `rpa client metrics` returns:
@@ -81,5 +82,5 @@ Example:
 - `rpa_client_exit_success_total`
 - `rpa_client_exit_failure_total`
 - `rpa_client_last_trigger`
-- `rpa_client_last_success_unix` (optional)
+- `rpa_client_last_success_unix` (optional, set after the success grace period)
 - `rpa_client_backoff_ms` (optional)
