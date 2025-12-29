@@ -1103,14 +1103,14 @@ func runStatus(args []string) int {
 	}
 	fmt.Printf("state: %s\n", resp.Data["state"])
 	fmt.Printf("summary: %s\n", resp.Data["summary"])
-	localForwards := strings.TrimSpace(resp.Data["local_forwards"])
-	if localForwards == "" {
-		localForwards = strings.Join(config.NormalizeLocalForwards(cfg), ",")
+	remoteForwards := strings.TrimSpace(resp.Data["remote_forwards"])
+	if remoteForwards == "" {
+		remoteForwards = strings.Join(config.NormalizeRemoteForwards(cfg), ",")
 	}
-	if localForwards == "" {
-		localForwards = "(none)"
+	if remoteForwards == "" {
+		remoteForwards = "(none)"
 	}
-	fmt.Printf("local_forwards: %s\n", localForwards)
+	fmt.Printf("remote_forwards: %s\n", remoteForwards)
 	fmt.Printf("uptime: %s\n", resp.Data["uptime"])
 	fmt.Printf("restarts: %s\n", resp.Data["restarts"])
 	fmt.Printf("last_exit: %s\n", resp.Data["last_exit"])
