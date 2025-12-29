@@ -1,7 +1,7 @@
-// Package agent builds the ssh command line from config for the supervisor loop.
-// It is used by Agent.Start when launching the tunnel.
+// Package client builds the ssh command line for local forwards.
+// It is used by Client.Start when launching the tunnel.
 
-package agent
+package client
 
 import (
 	"fmt"
@@ -14,8 +14,8 @@ import (
 	"reverse-proxy-agent/pkg/config"
 )
 
-func buildSSHCommand(cfg *config.Config, remoteForwards []string) (*exec.Cmd, error) {
-	if err := config.ValidateAgent(cfg); err != nil {
+func buildSSHCommand(cfg *config.Config, localForwards []string) (*exec.Cmd, error) {
+	if err := config.ValidateClient(cfg); err != nil {
 		return nil, err
 	}
 
@@ -26,11 +26,11 @@ func buildSSHCommand(cfg *config.Config, remoteForwards []string) (*exec.Cmd, er
 		"-o", "BatchMode=yes",
 	}
 
-	for _, forward := range remoteForwards {
+	for _, forward := range localForwards {
 		if strings.TrimSpace(forward) == "" {
 			continue
 		}
-		args = append(args, "-R", forward)
+		args = append(args, "-L", forward)
 	}
 
 	if cfg.SSH.IdentityFile != "" {

@@ -19,6 +19,13 @@ Event-specific fields:
 - `ssh_exited`: `exit`, `class`, optional `stderr`
 - `restart_triggered`: `reason`
 - `restart_skipped`: `reason`, `detail`
+- `restart_scheduled`: `delay_ms`
+- `stop_during_backoff`: none
+- `agent_stop_requested`: none
+- `client_start`: `summary`
+- `client_stop`: none
+- `client_stop_requested`: none
+- `restart_policy_stop`: `policy`, `class`, optional `reason`
 
 Example:
 ```json
@@ -31,6 +38,18 @@ Example:
 - `state`: `STOPPED|CONNECTING|CONNECTED`
 - `summary`: `user@host:port`
 - `uptime`: agent uptime
+- `socket`: unix socket path
+- `restarts`: restart count
+- `last_exit`: last exit description
+- `last_class`: exit classification
+- `last_trigger`: last restart trigger reason
+- `last_success_unix`: unix timestamp of last success (optional)
+- `backoff_ms`: current backoff (optional)
+
+`rpa client status` returns:
+- `state`: `STOPPED|CONNECTING|CONNECTED`
+- `summary`: `user@host:port (local=...)`
+- `uptime`: client uptime
 - `socket`: unix socket path
 - `restarts`: restart count
 - `last_exit`: last exit description
@@ -52,3 +71,15 @@ Example:
 - `rpa_agent_last_trigger`
 - `rpa_agent_last_success_unix` (optional)
 - `rpa_agent_backoff_ms` (optional)
+
+`rpa client metrics` returns:
+- `rpa_client_state`
+- `rpa_client_restart_total`
+- `rpa_client_uptime_sec`
+- `rpa_client_start_success_total`
+- `rpa_client_start_failure_total`
+- `rpa_client_exit_success_total`
+- `rpa_client_exit_failure_total`
+- `rpa_client_last_trigger`
+- `rpa_client_last_success_unix` (optional)
+- `rpa_client_backoff_ms` (optional)

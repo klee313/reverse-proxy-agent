@@ -58,6 +58,10 @@ func NewLogger(cfg *config.Config, ring *LogBuffer) (*Logger, error) {
 	if err != nil {
 		return nil, err
 	}
+	return NewLoggerWithPath(path, ring)
+}
+
+func NewLoggerWithPath(path string, ring *LogBuffer) (*Logger, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, fmt.Errorf("create log dir: %w", err)
 	}

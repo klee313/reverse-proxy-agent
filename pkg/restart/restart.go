@@ -1,10 +1,9 @@
-// Package agent defines restart policy parsing and backoff timing.
-// It is used by the agent loop for retry scheduling.
+// Package restart defines restart policy parsing and backoff timing.
+// It is shared by agent and client supervisors.
 
-package agent
+package restart
 
 import (
-	"fmt"
 	"math/rand"
 	"strings"
 	"time"
@@ -12,23 +11,30 @@ import (
 	"reverse-proxy-agent/pkg/config"
 )
 
-type restartPolicy int
+type Policy int
 
 const (
-	restartAlways restartPolicy = iota
-	restartOnFailure
+	PolicyAlways Policy = iota
+	PolicyOnFailure
 )
 
-func parseRestartPolicy(raw string) restartPolicy {
+func ParsePolicy(raw string) Policy {
 	switch strings.ToLower(raw) {
 	case "on-failure":
-		return restartOnFailure
+		return PolicyOnFailure
 	default:
-		return restartAlways
+		return PolicyAlways
 	}
 }
 
-type backoff struct {
+func (p Policy) Name() string {
+	if p == PolicyOnFailure {
+		return "on-failure"
+	}
+	return "always"
+}
+
+type Backoff struct {
 	min    time.Duration
 	max    time.Duration
 	factor float64
@@ -37,8 +43,8 @@ type backoff struct {
 	rng    *rand.Rand
 }
 
-func newBackoff(cfg config.RestartConfig) *backoff {
-	return &backoff{
+func NewBackoff(cfg config.RestartConfig) *Backoff {
+	return &Backoff{
 		min:    time.Duration(cfg.MinDelayMs) * time.Millisecond,
 		max:    time.Duration(cfg.MaxDelayMs) * time.Millisecond,
 		factor: cfg.Factor,
@@ -47,7 +53,7 @@ func newBackoff(cfg config.RestartConfig) *backoff {
 	}
 }
 
-func (b *backoff) Next() time.Duration {
+func (b *Backoff) Next() time.Duration {
 	if b.min <= 0 {
 		return 0
 	}
@@ -63,11 +69,11 @@ func (b *backoff) Next() time.Duration {
 	return b.jittered(b.cur)
 }
 
-func (b *backoff) Reset() {
+func (b *Backoff) Reset() {
 	b.cur = 0
 }
 
-func (b *backoff) ForceMax() {
+func (b *Backoff) ForceMax() {
 	if b.max <= 0 {
 		b.cur = b.min
 		return
@@ -75,11 +81,11 @@ func (b *backoff) ForceMax() {
 	b.cur = b.max
 }
 
-func (b *backoff) Current() time.Duration {
+func (b *Backoff) Current() time.Duration {
 	return b.cur
 }
 
-func (b *backoff) jittered(d time.Duration) time.Duration {
+func (b *Backoff) jittered(d time.Duration) time.Duration {
 	if b.jitter <= 0 {
 		return d
 	}
@@ -89,11 +95,4 @@ func (b *backoff) jittered(d time.Duration) time.Duration {
 		return 0
 	}
 	return out
-}
-
-func formatExit(exitCode int, err error) string {
-	if err == nil {
-		return "exit code 0"
-	}
-	return fmt.Sprintf("exit code %d (%v)", exitCode, err)
 }

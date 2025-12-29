@@ -1,7 +1,7 @@
-// Package ipc provides a Unix socket client for querying a running agent.
+// Package agent provides a Unix socket client for querying a running agent.
 // It is used by cli commands such as status, logs, and metrics.
 
-package ipc
+package agent
 
 import (
 	"bufio"

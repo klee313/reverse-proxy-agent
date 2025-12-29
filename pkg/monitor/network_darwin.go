@@ -68,7 +68,6 @@ import (
 	"context"
 	"sync"
 
-	"reverse-proxy-agent/pkg/config"
 	"reverse-proxy-agent/pkg/logging"
 )
 
@@ -91,7 +90,7 @@ func networkCallbackGo() {
 	}
 }
 
-func StartNetworkMonitor(ctx context.Context, _ config.AgentConfig, logger *logging.Logger, onEvent func(reason string)) {
+func StartNetworkMonitor(ctx context.Context, _ Config, logger *logging.Logger, onEvent func(reason string)) {
 	if onEvent == nil {
 		onEvent = func(string) {}
 	}

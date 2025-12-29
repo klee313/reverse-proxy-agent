@@ -9,11 +9,10 @@ import (
 	"context"
 	"time"
 
-	"reverse-proxy-agent/pkg/config"
 	"reverse-proxy-agent/pkg/logging"
 )
 
-func StartSleepMonitor(ctx context.Context, cfg config.AgentConfig, logger *logging.Logger, onEvent func(reason string)) {
+func StartSleepMonitor(ctx context.Context, cfg Config, logger *logging.Logger, onEvent func(reason string)) {
 	if cfg.SleepCheckSec <= 0 {
 		return
 	}

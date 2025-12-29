@@ -13,11 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"reverse-proxy-agent/pkg/config"
 	"reverse-proxy-agent/pkg/logging"
 )
 
-func StartNetworkMonitor(ctx context.Context, cfg config.AgentConfig, logger *logging.Logger, onEvent func(reason string)) {
+func StartNetworkMonitor(ctx context.Context, cfg Config, logger *logging.Logger, onEvent func(reason string)) {
 	if cfg.NetworkPollSec <= 0 {
 		return
 	}

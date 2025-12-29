@@ -14,9 +14,11 @@ import (
 )
 
 type Config struct {
-	Agent   AgentConfig   `yaml:"agent"`
-	SSH     SSHConfig     `yaml:"ssh"`
-	Logging LoggingConfig `yaml:"logging"`
+	Agent         AgentConfig   `yaml:"agent"`
+	Client        ClientConfig  `yaml:"client"`
+	SSH           SSHConfig     `yaml:"ssh"`
+	Logging       LoggingConfig `yaml:"logging"`
+	ClientLogging LoggingConfig `yaml:"client_logging"`
 }
 
 type AgentConfig struct {
@@ -30,11 +32,23 @@ type AgentConfig struct {
 	NetworkPollSec     int           `yaml:"network_poll_sec"`
 }
 
+type ClientConfig struct {
+	Name               string        `yaml:"name"`
+	LaunchdLabel       string        `yaml:"launchd_label"`
+	RestartPolicy      string        `yaml:"restart_policy"`
+	Restart            RestartConfig `yaml:"restart"`
+	PeriodicRestartSec int           `yaml:"periodic_restart_sec"`
+	SleepCheckSec      int           `yaml:"sleep_check_sec"`
+	SleepGapSec        int           `yaml:"sleep_gap_sec"`
+	NetworkPollSec     int           `yaml:"network_poll_sec"`
+	LocalForward       string        `yaml:"local_forward"`
+	LocalForwards      []string      `yaml:"local_forwards"`
+}
+
 type SSHConfig struct {
 	User           string   `yaml:"user"`
 	Host           string   `yaml:"host"`
 	Port           int      `yaml:"port"`
-	RemoteForward  string   `yaml:"remote_forward"`
 	RemoteForwards []string `yaml:"remote_forwards"`
 	IdentityFile   string   `yaml:"identity_file"`
 	Options        []string `yaml:"options"`
@@ -116,6 +130,42 @@ func applyDefaults(cfg *Config) {
 	if cfg.Agent.Restart.DebounceMs == 0 {
 		cfg.Agent.Restart.DebounceMs = 2000
 	}
+	if cfg.Client.Name == "" {
+		cfg.Client.Name = "rpa-client"
+	}
+	if cfg.Client.LaunchdLabel == "" {
+		cfg.Client.LaunchdLabel = "com.rpa.client"
+	}
+	if cfg.Client.RestartPolicy == "" {
+		cfg.Client.RestartPolicy = "always"
+	}
+	if cfg.Client.PeriodicRestartSec < 0 {
+		cfg.Client.PeriodicRestartSec = 0
+	}
+	if cfg.Client.SleepCheckSec == 0 {
+		cfg.Client.SleepCheckSec = 5
+	}
+	if cfg.Client.SleepGapSec == 0 {
+		cfg.Client.SleepGapSec = 30
+	}
+	if cfg.Client.NetworkPollSec == 0 {
+		cfg.Client.NetworkPollSec = 5
+	}
+	if cfg.Client.Restart.MinDelayMs == 0 {
+		cfg.Client.Restart.MinDelayMs = 2000
+	}
+	if cfg.Client.Restart.MaxDelayMs == 0 {
+		cfg.Client.Restart.MaxDelayMs = 30000
+	}
+	if cfg.Client.Restart.Factor == 0 {
+		cfg.Client.Restart.Factor = 2.0
+	}
+	if cfg.Client.Restart.Jitter == 0 {
+		cfg.Client.Restart.Jitter = 0.2
+	}
+	if cfg.Client.Restart.DebounceMs == 0 {
+		cfg.Client.Restart.DebounceMs = 2000
+	}
 	if cfg.SSH.Port == 0 {
 		cfg.SSH.Port = 22
 	}
@@ -131,9 +181,35 @@ func applyDefaults(cfg *Config) {
 	if cfg.Logging.Path == "" {
 		cfg.Logging.Path = "~/.rpa/logs/agent.log"
 	}
+	if cfg.ClientLogging.Level == "" {
+		cfg.ClientLogging.Level = "info"
+	}
+	if cfg.ClientLogging.Path == "" {
+		cfg.ClientLogging.Path = "~/.rpa/logs/client.log"
+	}
 }
 
-func Validate(cfg *Config) error {
+func ValidateAgent(cfg *Config) error {
+	if err := validateCommon(cfg); err != nil {
+		return err
+	}
+	if len(NormalizeRemoteForwards(cfg)) == 0 {
+		return errors.New("ssh.remote_forwards is required")
+	}
+	return validateSupervisor(cfg.Agent.RestartPolicy, cfg.Agent.Restart, cfg.Agent.PeriodicRestartSec, cfg.Agent.SleepCheckSec, cfg.Agent.SleepGapSec, cfg.Agent.NetworkPollSec, "agent")
+}
+
+func ValidateClient(cfg *Config) error {
+	if err := validateCommon(cfg); err != nil {
+		return err
+	}
+	if len(NormalizeLocalForwards(cfg)) == 0 {
+		return errors.New("client.local_forward or client.local_forwards is required")
+	}
+	return validateSupervisor(cfg.Client.RestartPolicy, cfg.Client.Restart, cfg.Client.PeriodicRestartSec, cfg.Client.SleepCheckSec, cfg.Client.SleepGapSec, cfg.Client.NetworkPollSec, "client")
+}
+
+func validateCommon(cfg *Config) error {
 	if cfg == nil {
 		return errors.New("config is nil")
 	}
@@ -143,43 +219,44 @@ func Validate(cfg *Config) error {
 	if strings.TrimSpace(cfg.SSH.User) == "" {
 		return errors.New("ssh.user is required")
 	}
-	if len(NormalizeRemoteForwards(cfg)) == 0 {
-		return errors.New("ssh.remote_forward or ssh.remote_forwards is required")
-	}
 	if cfg.SSH.Port <= 0 {
 		return fmt.Errorf("ssh.port must be > 0 (got %d)", cfg.SSH.Port)
 	}
-	switch strings.ToLower(cfg.Agent.RestartPolicy) {
+	return nil
+}
+
+func validateSupervisor(policy string, restartCfg RestartConfig, periodic, sleepCheck, sleepGap, networkPoll int, label string) error {
+	switch strings.ToLower(policy) {
 	case "always", "on-failure":
 	default:
-		return fmt.Errorf("agent.restart_policy must be always or on-failure (got %q)", cfg.Agent.RestartPolicy)
+		return fmt.Errorf("%s.restart_policy must be always or on-failure (got %q)", label, policy)
 	}
-	if cfg.Agent.Restart.MinDelayMs < 0 || cfg.Agent.Restart.MaxDelayMs < 0 {
-		return errors.New("agent.restart min/max delay must be >= 0")
+	if restartCfg.MinDelayMs < 0 || restartCfg.MaxDelayMs < 0 {
+		return fmt.Errorf("%s.restart min/max delay must be >= 0", label)
 	}
-	if cfg.Agent.Restart.MaxDelayMs > 0 && cfg.Agent.Restart.MinDelayMs > cfg.Agent.Restart.MaxDelayMs {
-		return errors.New("agent.restart min delay must be <= max delay")
+	if restartCfg.MaxDelayMs > 0 && restartCfg.MinDelayMs > restartCfg.MaxDelayMs {
+		return fmt.Errorf("%s.restart min delay must be <= max delay", label)
 	}
-	if cfg.Agent.Restart.Factor < 1.0 {
-		return errors.New("agent.restart factor must be >= 1.0")
+	if restartCfg.Factor < 1.0 {
+		return fmt.Errorf("%s.restart factor must be >= 1.0", label)
 	}
-	if cfg.Agent.Restart.Jitter < 0 || cfg.Agent.Restart.Jitter > 1.0 {
-		return errors.New("agent.restart jitter must be between 0 and 1")
+	if restartCfg.Jitter < 0 || restartCfg.Jitter > 1.0 {
+		return fmt.Errorf("%s.restart jitter must be between 0 and 1", label)
 	}
-	if cfg.Agent.Restart.DebounceMs < 0 {
-		return errors.New("agent.restart debounce_ms must be >= 0")
+	if restartCfg.DebounceMs < 0 {
+		return fmt.Errorf("%s.restart debounce_ms must be >= 0", label)
 	}
-	if cfg.Agent.PeriodicRestartSec < 0 {
-		return errors.New("agent.periodic_restart_sec must be >= 0")
+	if periodic < 0 {
+		return fmt.Errorf("%s.periodic_restart_sec must be >= 0", label)
 	}
-	if cfg.Agent.SleepCheckSec < 0 {
-		return errors.New("agent.sleep_check_sec must be >= 0")
+	if sleepCheck < 0 {
+		return fmt.Errorf("%s.sleep_check_sec must be >= 0", label)
 	}
-	if cfg.Agent.SleepGapSec < 0 {
-		return errors.New("agent.sleep_gap_sec must be >= 0")
+	if sleepGap < 0 {
+		return fmt.Errorf("%s.sleep_gap_sec must be >= 0", label)
 	}
-	if cfg.Agent.NetworkPollSec < 0 {
-		return errors.New("agent.network_poll_sec must be >= 0")
+	if networkPoll < 0 {
+		return fmt.Errorf("%s.network_poll_sec must be >= 0", label)
 	}
 	return nil
 }
@@ -188,7 +265,7 @@ func NormalizeRemoteForwards(cfg *Config) []string {
 	if cfg == nil {
 		return nil
 	}
-	out := make([]string, 0, 1+len(cfg.SSH.RemoteForwards))
+	out := make([]string, 0, len(cfg.SSH.RemoteForwards))
 	seen := make(map[string]struct{})
 	add := func(value string) {
 		trimmed := strings.TrimSpace(value)
@@ -201,8 +278,31 @@ func NormalizeRemoteForwards(cfg *Config) []string {
 		seen[trimmed] = struct{}{}
 		out = append(out, trimmed)
 	}
-	add(cfg.SSH.RemoteForward)
 	for _, value := range cfg.SSH.RemoteForwards {
+		add(value)
+	}
+	return out
+}
+
+func NormalizeLocalForwards(cfg *Config) []string {
+	if cfg == nil {
+		return nil
+	}
+	out := make([]string, 0, 1+len(cfg.Client.LocalForwards))
+	seen := make(map[string]struct{})
+	add := func(value string) {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			return
+		}
+		if _, ok := seen[trimmed]; ok {
+			return
+		}
+		seen[trimmed] = struct{}{}
+		out = append(out, trimmed)
+	}
+	add(cfg.Client.LocalForward)
+	for _, value := range cfg.Client.LocalForwards {
 		add(value)
 	}
 	return out
@@ -225,16 +325,36 @@ func SetRemoteForwards(cfg *Config, forwards []string) {
 		seen[val] = struct{}{}
 		trimmed = append(trimmed, val)
 	}
+	cfg.SSH.RemoteForwards = append([]string(nil), trimmed...)
+}
+
+func SetLocalForwards(cfg *Config, forwards []string) {
+	if cfg == nil {
+		return
+	}
+	trimmed := make([]string, 0, len(forwards))
+	seen := make(map[string]struct{})
+	for _, value := range forwards {
+		val := strings.TrimSpace(value)
+		if val == "" {
+			continue
+		}
+		if _, ok := seen[val]; ok {
+			continue
+		}
+		seen[val] = struct{}{}
+		trimmed = append(trimmed, val)
+	}
 	switch len(trimmed) {
 	case 0:
-		cfg.SSH.RemoteForward = ""
-		cfg.SSH.RemoteForwards = nil
+		cfg.Client.LocalForward = ""
+		cfg.Client.LocalForwards = nil
 	case 1:
-		cfg.SSH.RemoteForward = trimmed[0]
-		cfg.SSH.RemoteForwards = nil
+		cfg.Client.LocalForward = trimmed[0]
+		cfg.Client.LocalForwards = nil
 	default:
-		cfg.SSH.RemoteForward = trimmed[0]
-		cfg.SSH.RemoteForwards = append([]string(nil), trimmed[1:]...)
+		cfg.Client.LocalForward = trimmed[0]
+		cfg.Client.LocalForwards = append([]string(nil), trimmed[1:]...)
 	}
 }
 
@@ -269,11 +389,29 @@ func SocketPath(cfg *Config) (string, error) {
 	return filepath.Join(home, ".rpa", "agent.sock"), nil
 }
 
+func ClientSocketPath(cfg *Config) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve home dir: %w", err)
+	}
+	if cfg == nil {
+		return "", errors.New("config is nil")
+	}
+	return filepath.Join(home, ".rpa", "client.sock"), nil
+}
+
 func LogPath(cfg *Config) (string, error) {
 	if cfg == nil {
 		return "", errors.New("config is nil")
 	}
 	return expandHome(cfg.Logging.Path)
+}
+
+func ClientLogPath(cfg *Config) (string, error) {
+	if cfg == nil {
+		return "", errors.New("config is nil")
+	}
+	return expandHome(cfg.ClientLogging.Path)
 }
 
 func expandHome(path string) (string, error) {
