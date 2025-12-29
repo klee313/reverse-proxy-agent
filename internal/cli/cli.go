@@ -788,9 +788,14 @@ func runClientStatus(args []string) int {
 	}
 	fmt.Printf("state: %s\n", resp.Data["state"])
 	fmt.Printf("summary: %s\n", resp.Data["summary"])
-	if v, ok := resp.Data["remote_forwards"]; ok && v != "" {
-		fmt.Printf("remote_forwards: %s\n", v)
+	remoteForwards := strings.TrimSpace(resp.Data["remote_forwards"])
+	if remoteForwards == "" {
+		remoteForwards = strings.Join(config.NormalizeRemoteForwards(cfg), ",")
 	}
+	if remoteForwards == "" {
+		remoteForwards = "(none)"
+	}
+	fmt.Printf("remote_forwards: %s\n", remoteForwards)
 	fmt.Printf("uptime: %s\n", resp.Data["uptime"])
 	fmt.Printf("restarts: %s\n", resp.Data["restarts"])
 	fmt.Printf("last_exit: %s\n", resp.Data["last_exit"])
@@ -1076,9 +1081,14 @@ func runStatus(args []string) int {
 	}
 	fmt.Printf("state: %s\n", resp.Data["state"])
 	fmt.Printf("summary: %s\n", resp.Data["summary"])
-	if v, ok := resp.Data["local_forwards"]; ok && v != "" {
-		fmt.Printf("local_forwards: %s\n", v)
+	localForwards := strings.TrimSpace(resp.Data["local_forwards"])
+	if localForwards == "" {
+		localForwards = strings.Join(config.NormalizeLocalForwards(cfg), ",")
 	}
+	if localForwards == "" {
+		localForwards = "(none)"
+	}
+	fmt.Printf("local_forwards: %s\n", localForwards)
 	fmt.Printf("uptime: %s\n", resp.Data["uptime"])
 	fmt.Printf("restarts: %s\n", resp.Data["restarts"])
 	fmt.Printf("last_exit: %s\n", resp.Data["last_exit"])

@@ -148,9 +148,7 @@ func (s *Server) handleStatus(conn net.Conn) {
 		"last_class":   s.agent.LastClass(),
 		"last_trigger": s.agent.LastTriggerReason(),
 	}
-	if forwards := s.agent.RemoteForwards(); len(forwards) > 0 {
-		data["remote_forwards"] = strings.Join(forwards, ",")
-	}
+	data["remote_forwards"] = strings.Join(s.agent.RemoteForwards(), ",")
 	if !s.agent.LastSuccess().IsZero() {
 		data["last_success_unix"] = fmt.Sprintf("%d", s.agent.LastSuccess().Unix())
 	}
