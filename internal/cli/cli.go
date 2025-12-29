@@ -45,6 +45,16 @@ func Run(args []string) int {
 
 	switch args[0] {
 	case "help", "-h", "--help":
+		if len(args) > 1 {
+			switch args[1] {
+			case "agent":
+				printAgentUsage()
+				return exitOK
+			case "client":
+				printClientUsage()
+				return exitOK
+			}
+		}
 		printUsage()
 		return exitOK
 	case "init":
@@ -69,9 +79,13 @@ func Run(args []string) int {
 func runAgent(args []string) int {
 	if len(args) == 0 {
 		fmt.Fprintln(os.Stderr, "missing agent subcommand (up|down|run|add|remove|clear)")
+		printAgentUsage()
 		return exitUsage
 	}
 	switch args[0] {
+	case "help", "-h", "--help":
+		printAgentUsage()
+		return exitOK
 	case "up":
 		return runAgentUp(args[1:])
 	case "down":
@@ -93,9 +107,13 @@ func runAgent(args []string) int {
 func runClient(args []string) int {
 	if len(args) == 0 {
 		fmt.Fprintln(os.Stderr, "missing client subcommand (up|down|run|add|remove|clear|status|logs|metrics|doctor)")
+		printClientUsage()
 		return exitUsage
 	}
 	switch args[0] {
+	case "help", "-h", "--help":
+		printClientUsage()
+		return exitOK
 	case "up":
 		return runClientUp(args[1:])
 	case "down":
@@ -1246,18 +1264,50 @@ func printUsage() {
 	fmt.Println("Reverse Proxy Agent for resilient SSH tunnels on macOS.")
 	fmt.Println("")
 	fmt.Println("Usage:")
-	fmt.Println("  rpa init --ssh-user user --ssh-host host --remote-forward spec [--config rpa.yaml]")
-	fmt.Println("  rpa init --ssh-user user --ssh-host host --local-forward spec [--config rpa.yaml]")
+	fmt.Println("  rpa init [flags]             (write config)")
+	fmt.Println("  rpa agent <cmd> [flags]      (remote forwards)")
+	fmt.Println("  rpa client <cmd> [flags]     (local forwards)")
+	fmt.Println("  rpa status|logs|metrics      (observability)")
 	fmt.Println("")
-	fmt.Println("Agent commands (remote forward):")
-	fmt.Println("  rpa agent up --config rpa.yaml        (install & start launchd service)")
+	fmt.Println("Quick help:")
+	fmt.Println("  rpa init --help")
+	fmt.Println("  rpa agent help")
+	fmt.Println("  rpa client help")
+	fmt.Println("")
+	fmt.Println("Environment:")
+	fmt.Println("  RPA_CONFIG overrides the default config path")
+	fmt.Println("  Default config path: ~/.rpa/rpa.yaml")
+}
+
+func printAgentUsage() {
+	fmt.Println("rpa agent")
+	fmt.Println("")
+	fmt.Println("Agent manages remote forwards and keeps SSH tunnels alive in the background.")
+	fmt.Println("")
+	fmt.Println("Usage:")
+	fmt.Println("  rpa agent up --config rpa.yaml")
 	fmt.Println("  rpa agent down --config rpa.yaml")
-	fmt.Println("  rpa agent run --config rpa.yaml       (run in foreground for debugging)")
+	fmt.Println("  rpa agent run --config rpa.yaml")
 	fmt.Println("  rpa agent add --remote-forward spec --config rpa.yaml")
 	fmt.Println("  rpa agent remove --remote-forward spec --config rpa.yaml")
 	fmt.Println("  rpa agent clear --config rpa.yaml")
 	fmt.Println("")
-	fmt.Println("Client commands (local forward):")
+	fmt.Println("Notes:")
+	fmt.Println("  up: install & start launchd service (persisted)")
+	fmt.Println("  run: run in foreground for debugging (non-persistent)")
+	fmt.Println("  add/remove: updates config and restarts running agent if active")
+	fmt.Println("  clear: removes all forwards and stops the service")
+	fmt.Println("")
+	fmt.Println("Remote forward spec example:")
+	fmt.Println("  \"0.0.0.0:2222:localhost:22\"  (bind:remotePort:localHost:localPort)")
+}
+
+func printClientUsage() {
+	fmt.Println("rpa client")
+	fmt.Println("")
+	fmt.Println("Client manages local forwards and keeps SSH tunnels alive in the background.")
+	fmt.Println("")
+	fmt.Println("Usage:")
 	fmt.Println("  rpa client up --config rpa.yaml [--local-forward spec]")
 	fmt.Println("  rpa client down --config rpa.yaml")
 	fmt.Println("  rpa client run --config rpa.yaml [--local-forward spec]")
@@ -1269,22 +1319,12 @@ func printUsage() {
 	fmt.Println("  rpa client metrics --config rpa.yaml")
 	fmt.Println("  rpa client doctor --config rpa.yaml [--local-forward spec]")
 	fmt.Println("")
-	fmt.Println("Observability:")
-	fmt.Println("  rpa status --config rpa.yaml")
-	fmt.Println("  rpa logs --config rpa.yaml [--follow]")
-	fmt.Println("  rpa metrics --config rpa.yaml")
-	fmt.Println("")
-	fmt.Println("Forward spec examples:")
-	fmt.Println("  remote: \"0.0.0.0:2222:localhost:22\"  (bind:remotePort:localHost:localPort)")
-	fmt.Println("  local:  \"127.0.0.1:15432:127.0.0.1:5432\" (bind:localPort:remoteHost:remotePort)")
-	fmt.Println("")
-	fmt.Println("Help:")
-	fmt.Println("  rpa init --help")
-	fmt.Println("")
-	fmt.Println("Environment:")
-	fmt.Println("  RPA_CONFIG overrides the default config path")
-	fmt.Println("  Default config path: ~/.rpa/rpa.yaml")
 	fmt.Println("Notes:")
-	fmt.Println("  agent clear removes all forwards and stops the service")
-	fmt.Println("  client clear removes all forwards and stops the service")
+	fmt.Println("  up: install & start launchd service (persisted)")
+	fmt.Println("  run: run in foreground for debugging (non-persistent)")
+	fmt.Println("  add/remove: updates config and restarts running client if active")
+	fmt.Println("  clear: removes all forwards and stops the service")
+	fmt.Println("")
+	fmt.Println("Local forward spec example:")
+	fmt.Println("  \"127.0.0.1:15432:127.0.0.1:5432\" (bind:localPort:remoteHost:remotePort)")
 }

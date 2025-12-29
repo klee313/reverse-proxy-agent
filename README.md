@@ -208,6 +208,7 @@ client_logging:
 - 로그는 JSON 라인 형식
 - `last_success_unix`는 연결이 2초 이상 유지된 뒤에만 기록됨
 - status/metrics 상세 스키마: `docs/OBSERVABILITY.md`
+- 구현/복구 로직 상세 설명: `docs/ARCHITECTURE.md`
 
 ## 릴리스 (GitHub Releases)
 
