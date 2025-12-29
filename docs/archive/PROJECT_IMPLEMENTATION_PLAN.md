@@ -327,7 +327,7 @@ Central Server는 공개키 기반 인증만 수행하며, 애플리케이션 �
 - 도달 기준:
   한 줄 명령으로 터널이 열린다.
 - 진행 상태:
-  미진행
+  완료 (init 이후 client run/up로 1~2줄 실행, local forward 지원)
 
 10.2.2 단계 2: SSH 실행
 
@@ -338,7 +338,7 @@ Central Server는 공개키 기반 인증만 수행하며, 애플리케이션 �
 - 도달 기준:
   Client 터널도 half-dead가 발생하지 않는다.
 - 진행 상태:
-  미진행
+  완료 (SSH 옵션 공유, keepalive 적용)
 
 10.2.3 단계 3: 서비스 모드(launchd) 제공
 
@@ -350,7 +350,7 @@ Central Server는 공개키 기반 인증만 수행하며, 애플리케이션 �
 - 도달 기준:
   `client up` 이후 사용자가 `client down` 하기 전까지 local forward가 유지된다.
 - 진행 상태:
-  미진행
+  완료 (client up/down 제공, sleep/network 이벤트 재시작 적용)
 
 10.2.4 단계 4: 진단 친화성(에러 메시지/doctor)
 
@@ -362,7 +362,7 @@ Central Server는 공개키 기반 인증만 수행하며, 애플리케이션 �
 - 도달 기준:
   연결 실패 시 사용자가 다음 행동(키 확인, 서버 확인 등)을 결정할 수 있다.
 - 진행 상태:
-  미진행
+  완료 (실패 분류 및 doctor 커맨드 제공)
 
 11. 성공 기준 (Success Criteria)
 
