@@ -6,7 +6,7 @@ launchd 서비스 모드와 포그라운드 실행을 모두 지원하고, sleep
 ## 기능
 
 - Agent(원격 포워드) 모드: `agent up/down/run`, 동적 포워드 add/remove/clear
-- Client(로컬 포워드) 모드: `client up/down/run/add/remove/clear`, 진단 `client doctor`
+- Client(로컬 포워드) 모드: `client up/down/run/add/remove/clear`, 진단 `doctor client`
 - launchd 서비스 모드 지원
 - JSON 로그, status/metrics 제공
 - 설정 파일 기반 운영
@@ -104,9 +104,8 @@ rpa client run
 ### Client (서비스 모드)
 ```sh
 rpa client up
-rpa client status
-rpa client logs
-rpa client metrics
+rpa logs [agent|client]
+rpa metrics [agent|client]
 rpa client down
 ```
 
@@ -129,10 +128,10 @@ rpa client run --config path [--local-forward spec]
 rpa client add --local-forward spec --config path
 rpa client remove --local-forward spec --config path
 rpa client clear --config path
-rpa client status --config path
-rpa client logs --config path
-rpa client metrics --config path
-rpa client doctor --config path [--local-forward spec]
+rpa logs [agent|client] --config path
+rpa metrics [agent|client] --config path
+rpa doctor [client] --config path
+rpa doctor [agent|client] --config path [--remote-forward spec | --local-forward spec]
 
 rpa status --config path
 rpa logs --config path [--follow|-f]

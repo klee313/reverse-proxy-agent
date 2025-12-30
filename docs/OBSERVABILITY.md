@@ -35,7 +35,7 @@ Example:
 
 ### Status fields
 
-`rpa status` returns:
+`rpa status` returns an `agent` section with:
 - `state`: `STOPPED|CONNECTING|CONNECTED`
 - `summary`: `user@host:port`
 - `remote_forwards`: comma-separated remote forward specs (optional)
@@ -48,7 +48,7 @@ Example:
 - `last_success_unix`: unix timestamp of the last SSH session that stayed up past the success grace period (optional)
 - `backoff_ms`: current backoff (optional)
 
-`rpa client status` returns:
+`rpa status` returns a `client` section with:
 - `state`: `STOPPED|CONNECTING|CONNECTED`
 - `summary`: `user@host:port (local=...)`
 - `local_forwards`: comma-separated local forward specs (optional)
@@ -63,7 +63,7 @@ Example:
 
 ### Metrics keys
 
-`rpa metrics` returns:
+`rpa metrics [agent]` returns:
 - `rpa_agent_state`
 - `rpa_agent_restart_total`
 - `rpa_agent_uptime_sec`
@@ -75,7 +75,7 @@ Example:
 - `rpa_agent_last_success_unix` (optional, set after the success grace period)
 - `rpa_agent_backoff_ms` (optional)
 
-`rpa client metrics` returns:
+`rpa metrics client` returns:
 - `rpa_client_state`
 - `rpa_client_restart_total`
 - `rpa_client_uptime_sec`

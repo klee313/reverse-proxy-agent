@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -69,6 +70,8 @@ func Run(args []string) int {
 		return runLogs(args[1:])
 	case "metrics":
 		return runMetrics(args[1:])
+	case "doctor":
+		return runDoctor(args[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n", args[0])
 		printUsage()
@@ -106,7 +109,7 @@ func runAgent(args []string) int {
 
 func runClient(args []string) int {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "missing client subcommand (up|down|run|add|remove|clear|status|logs|metrics|doctor)")
+		fmt.Fprintln(os.Stderr, "missing client subcommand (up|down|run|add|remove|clear)")
 		printClientUsage()
 		return exitUsage
 	}
@@ -126,14 +129,6 @@ func runClient(args []string) int {
 		return runClientRemove(args[1:])
 	case "clear":
 		return runClientClear(args[1:])
-	case "status":
-		return runClientStatus(args[1:])
-	case "logs":
-		return runClientLogs(args[1:])
-	case "metrics":
-		return runClientMetrics(args[1:])
-	case "doctor":
-		return runClientDoctor(args[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown client subcommand: %s\n", args[0])
 		return exitUsage
@@ -784,56 +779,6 @@ func runClientDoctor(args []string) int {
 	return exitOK
 }
 
-func runClientStatus(args []string) int {
-	fs := flag.NewFlagSet("client status", flag.ContinueOnError)
-	configPath := fs.String("config", defaultConfigPath(), "path to config file")
-	if err := fs.Parse(args); err != nil {
-		return exitUsage
-	}
-
-	cfg, err := config.Load(*configPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "config load failed: %v\n", err)
-		return exitError
-	}
-
-	resp, err := ipcclientlocal.Query(cfg, "status")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "client status query failed: %v\n", err)
-		return exitError
-	}
-	if !resp.OK {
-		fmt.Fprintf(os.Stderr, "client status error: %s\n", resp.Message)
-		return exitError
-	}
-	fmt.Printf("state: %s\n", resp.Data["state"])
-	fmt.Printf("summary: %s\n", resp.Data["summary"])
-	remoteForwards := strings.TrimSpace(resp.Data["remote_forwards"])
-	if remoteForwards == "" {
-		remoteForwards = strings.Join(config.NormalizeRemoteForwards(cfg), ",")
-	}
-	if remoteForwards == "" {
-		remoteForwards = "(none)"
-	}
-	fmt.Printf("remote_forwards: %s\n", remoteForwards)
-	fmt.Printf("uptime: %s\n", resp.Data["uptime"])
-	fmt.Printf("restarts: %s\n", resp.Data["restarts"])
-	fmt.Printf("last_exit: %s\n", resp.Data["last_exit"])
-	if v, ok := resp.Data["last_class"]; ok && v != "" {
-		fmt.Printf("last_class: %s\n", v)
-	}
-	if v, ok := resp.Data["last_trigger"]; ok && v != "" {
-		fmt.Printf("last_trigger: %s\n", v)
-	}
-	if v, ok := resp.Data["last_success_unix"]; ok && v != "" {
-		fmt.Printf("last_success_unix: %s\n", v)
-	}
-	if v, ok := resp.Data["backoff_ms"]; ok && v != "" {
-		fmt.Printf("backoff_ms: %s\n", v)
-	}
-	return exitOK
-}
-
 func runClientLogs(args []string) int {
 	fs := flag.NewFlagSet("client logs", flag.ContinueOnError)
 	configPath := fs.String("config", defaultConfigPath(), "path to config file")
@@ -1092,41 +1037,89 @@ func runStatus(args []string) int {
 		return exitError
 	}
 
-	resp, err := ipcclient.Query(cfg, "status")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "status query failed: %v\n", err)
+	agentOK := printStatusBlock("agent", cfg, func() statusPayload {
+		resp, err := ipcclient.Query(cfg, "status")
+		if err != nil {
+			return statusPayload{err: err}
+		}
+		return statusPayload{ok: resp.OK, message: resp.Message, data: resp.Data}
+	})
+	clientOK := printStatusBlock("client", cfg, func() statusPayload {
+		resp, err := ipcclientlocal.Query(cfg, "status")
+		if err != nil {
+			return statusPayload{err: err}
+		}
+		return statusPayload{ok: resp.OK, message: resp.Message, data: resp.Data}
+	})
+	if !agentOK && !clientOK {
 		return exitError
-	}
-	if !resp.OK {
-		fmt.Fprintf(os.Stderr, "status error: %s\n", resp.Message)
-		return exitError
-	}
-	fmt.Printf("state: %s\n", resp.Data["state"])
-	fmt.Printf("summary: %s\n", resp.Data["summary"])
-	remoteForwards := strings.TrimSpace(resp.Data["remote_forwards"])
-	if remoteForwards == "" {
-		remoteForwards = strings.Join(config.NormalizeRemoteForwards(cfg), ",")
-	}
-	if remoteForwards == "" {
-		remoteForwards = "(none)"
-	}
-	fmt.Printf("remote_forwards: %s\n", remoteForwards)
-	fmt.Printf("uptime: %s\n", resp.Data["uptime"])
-	fmt.Printf("restarts: %s\n", resp.Data["restarts"])
-	fmt.Printf("last_exit: %s\n", resp.Data["last_exit"])
-	if v, ok := resp.Data["last_class"]; ok && v != "" {
-		fmt.Printf("last_class: %s\n", v)
-	}
-	if v, ok := resp.Data["last_success_unix"]; ok && v != "" {
-		fmt.Printf("last_success_unix: %s\n", v)
-	}
-	if v, ok := resp.Data["backoff_ms"]; ok && v != "" {
-		fmt.Printf("backoff_ms: %s\n", v)
 	}
 	return exitOK
 }
 
+type statusPayload struct {
+	ok      bool
+	message string
+	data    map[string]string
+	err     error
+}
+
+func printStatusBlock(label string, cfg *config.Config, query func() statusPayload) bool {
+	resp := query()
+	fmt.Printf("%s:\n", label)
+	if resp.err != nil {
+		fmt.Printf("  error: %s\n", resp.err.Error())
+		return false
+	}
+	if !resp.ok {
+		fmt.Printf("  error: %s\n", resp.message)
+		return false
+	}
+	fmt.Printf("  state: %s\n", resp.data["state"])
+	fmt.Printf("  summary: %s\n", resp.data["summary"])
+	if label == "agent" {
+		remoteForwards := strings.TrimSpace(resp.data["remote_forwards"])
+		if remoteForwards == "" {
+			remoteForwards = strings.Join(config.NormalizeRemoteForwards(cfg), ",")
+		}
+		if remoteForwards == "" {
+			remoteForwards = "(none)"
+		}
+		fmt.Printf("  remote_forwards: %s\n", remoteForwards)
+	} else {
+		localForwards := strings.TrimSpace(resp.data["local_forwards"])
+		if localForwards == "" {
+			localForwards = strings.Join(config.NormalizeLocalForwards(cfg), ",")
+		}
+		if localForwards == "" {
+			localForwards = "(none)"
+		}
+		fmt.Printf("  local_forwards: %s\n", localForwards)
+	}
+	fmt.Printf("  uptime: %s\n", resp.data["uptime"])
+	fmt.Printf("  restarts: %s\n", resp.data["restarts"])
+	fmt.Printf("  last_exit: %s\n", resp.data["last_exit"])
+	if v, ok := resp.data["last_class"]; ok && v != "" {
+		fmt.Printf("  last_class: %s\n", v)
+	}
+	if v, ok := resp.data["last_trigger"]; ok && v != "" {
+		fmt.Printf("  last_trigger: %s\n", v)
+	}
+	if v, ok := resp.data["last_success_unix"]; ok && v != "" {
+		fmt.Printf("  last_success_unix: %s\n", v)
+	}
+	if v, ok := resp.data["backoff_ms"]; ok && v != "" {
+		fmt.Printf("  backoff_ms: %s\n", v)
+	}
+	return true
+}
+
 func runLogs(args []string) int {
+	target := "agent"
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		target = args[0]
+		args = args[1:]
+	}
 	fs := flag.NewFlagSet("logs", flag.ContinueOnError)
 	follow := fs.Bool("follow", false, "follow logs (placeholder)")
 	followShort := fs.Bool("f", false, "follow logs (shorthand)")
@@ -1141,13 +1134,29 @@ func runLogs(args []string) int {
 		return exitError
 	}
 
-	if *follow || *followShort {
-		return followLogs(cfg)
+	switch target {
+	case "agent":
+		if *follow || *followShort {
+			return followLogs(cfg)
+		}
+		return printRecentLogs(cfg)
+	case "client":
+		if *follow || *followShort {
+			return followClientLogs(cfg)
+		}
+		return printRecentClientLogs(cfg)
+	default:
+		fmt.Fprintf(os.Stderr, "unknown logs target: %s\n", target)
+		return exitUsage
 	}
-	return printRecentLogs(cfg)
 }
 
 func runMetrics(args []string) int {
+	target := "agent"
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		target = args[0]
+		args = args[1:]
+	}
 	fs := flag.NewFlagSet("metrics", flag.ContinueOnError)
 	configPath := fs.String("config", defaultConfigPath(), "path to config file")
 	if err := fs.Parse(args); err != nil {
@@ -1160,17 +1169,128 @@ func runMetrics(args []string) int {
 		return exitError
 	}
 
-	resp, err := ipcclient.Query(cfg, "metrics")
+	switch target {
+	case "agent":
+		resp, err := ipcclient.Query(cfg, "metrics")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "metrics query failed: %v\n", err)
+			return exitError
+		}
+		if !resp.OK {
+			fmt.Fprintf(os.Stderr, "metrics error: %s\n", resp.Message)
+			return exitError
+		}
+		for k, v := range resp.Data {
+			fmt.Printf("%s %s\n", k, v)
+		}
+		return exitOK
+	case "client":
+		resp, err := ipcclientlocal.Query(cfg, "metrics")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "client metrics query failed: %v\n", err)
+			return exitError
+		}
+		if !resp.OK {
+			fmt.Fprintf(os.Stderr, "client metrics error: %s\n", resp.Message)
+			return exitError
+		}
+		for k, v := range resp.Data {
+			fmt.Printf("%s %s\n", k, v)
+		}
+		return exitOK
+	default:
+		fmt.Fprintf(os.Stderr, "unknown metrics target: %s\n", target)
+		return exitUsage
+	}
+}
+
+func runDoctor(args []string) int {
+	target := "client"
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		target = args[0]
+		args = args[1:]
+	}
+	switch target {
+	case "client":
+		return runClientDoctor(args)
+	case "agent":
+		return runAgentDoctor(args)
+	default:
+		fmt.Fprintf(os.Stderr, "doctor target must be agent or client")
+		return exitUsage
+	}
+}
+
+func runAgentDoctor(args []string) int {
+	fs := flag.NewFlagSet("agent doctor", flag.ContinueOnError)
+	configPath := fs.String("config", defaultConfigPath(), "path to config file")
+	remoteForward := fs.String("remote-forward", "", "ssh remote forward spec (optional)")
+	if err := fs.Parse(args); err != nil {
+		return exitUsage
+	}
+
+	cfg, err := config.Load(*configPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "metrics query failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "config load failed: %v\n", err)
 		return exitError
 	}
-	if !resp.OK {
-		fmt.Fprintf(os.Stderr, "metrics error: %s\n", resp.Message)
+	if strings.TrimSpace(*remoteForward) != "" {
+		config.SetRemoteForwards(cfg, []string{*remoteForward})
+	}
+
+	if err := config.ValidateAgent(cfg); err != nil {
+		fmt.Fprintf(os.Stderr, "config validation failed: %v\n", err)
 		return exitError
 	}
-	for k, v := range resp.Data {
-		fmt.Printf("%s %s\n", k, v)
+
+	ok := true
+	if _, err := exec.LookPath("ssh"); err != nil {
+		fmt.Fprintf(os.Stderr, "check ssh binary: FAIL (%v)\n", err)
+		ok = false
+	} else {
+		fmt.Println("check ssh binary: OK")
+	}
+
+	if cfg.SSH.IdentityFile != "" {
+		path := expandTilde(cfg.SSH.IdentityFile)
+		if _, err := os.Stat(path); err != nil {
+			fmt.Fprintf(os.Stderr, "check identity file: FAIL (%v)\n", err)
+			ok = false
+		} else {
+			fmt.Println("check identity file: OK")
+		}
+	}
+
+	if _, err := net.LookupHost(cfg.SSH.Host); err != nil {
+		fmt.Fprintf(os.Stderr, "check host resolve: FAIL (%v)\n", err)
+		ok = false
+	} else {
+		fmt.Println("check host resolve: OK")
+	}
+
+	forward := firstRemoteForward(cfg)
+	if forward != "" {
+		bindHost, bindPort, err := parseRemoteForward(forward)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "check remote forward: FAIL (%v)\n", err)
+			ok = false
+		} else {
+			if !isLoopbackHost(bindHost) && !isWildcardHost(bindHost) {
+				fmt.Fprintf(os.Stderr, "check remote bind host: WARN (non-local bind %s)\n", bindHost)
+			} else {
+				fmt.Println("check remote bind host: OK")
+			}
+			if _, err := strconv.Atoi(bindPort); err != nil {
+				fmt.Fprintf(os.Stderr, "check remote bind port: FAIL (%v)\n", err)
+				ok = false
+			} else {
+				fmt.Println("check remote bind port: OK")
+			}
+		}
+	}
+
+	if !ok {
+		return exitError
 	}
 	return exitOK
 }
@@ -1183,6 +1303,26 @@ func printRecentLogs(cfg *config.Config) int {
 	}
 	if !resp.OK {
 		fmt.Fprintf(os.Stderr, "logs error: %s\n", resp.Message)
+		return exitError
+	}
+	if len(resp.Logs) == 0 {
+		fmt.Println("no logs")
+		return exitOK
+	}
+	for _, line := range resp.Logs {
+		fmt.Println(line)
+	}
+	return exitOK
+}
+
+func printRecentClientLogs(cfg *config.Config) int {
+	resp, err := ipcclientlocal.Query(cfg, "logs")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "client logs query failed: %v\n", err)
+		return exitError
+	}
+	if !resp.OK {
+		fmt.Fprintf(os.Stderr, "client logs error: %s\n", resp.Message)
 		return exitError
 	}
 	if len(resp.Logs) == 0 {
@@ -1228,6 +1368,39 @@ func followLogs(cfg *config.Config) int {
 	}
 }
 
+func followClientLogs(cfg *config.Config) int {
+	logPath, err := config.ClientLogPath(cfg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "resolve client log path failed: %v\n", err)
+		return exitError
+	}
+	f, err := os.Open(logPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "open client log file failed: %v\n", err)
+		return exitError
+	}
+	defer f.Close()
+
+	if _, err := f.Seek(0, 2); err != nil {
+		fmt.Fprintf(os.Stderr, "seek client log file failed: %v\n", err)
+		return exitError
+	}
+
+	reader := bufio.NewReader(f)
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				time.Sleep(300 * time.Millisecond)
+				continue
+			}
+			fmt.Fprintf(os.Stderr, "read client log file failed: %v\n", err)
+			return exitError
+		}
+		fmt.Print(line)
+	}
+}
+
 func ensureDir(dir string) error {
 	if dir == "." || dir == "" {
 		return nil
@@ -1257,6 +1430,14 @@ func firstLocalForward(cfg *config.Config) string {
 	return forwards[0]
 }
 
+func firstRemoteForward(cfg *config.Config) string {
+	forwards := config.NormalizeRemoteForwards(cfg)
+	if len(forwards) == 0 {
+		return ""
+	}
+	return forwards[0]
+}
+
 func parseLocalForward(spec string) (string, string, error) {
 	parts := strings.Split(spec, ":")
 	switch len(parts) {
@@ -1267,6 +1448,31 @@ func parseLocalForward(spec string) (string, string, error) {
 	default:
 		return "", "", fmt.Errorf("invalid local forward: %s", spec)
 	}
+}
+
+func parseRemoteForward(spec string) (string, string, error) {
+	parts := strings.Split(spec, ":")
+	switch len(parts) {
+	case 3:
+		return "127.0.0.1", parts[0], nil
+	case 4:
+		return parts[0], parts[1], nil
+	default:
+		return "", "", fmt.Errorf("invalid remote forward: %s", spec)
+	}
+}
+
+func isLoopbackHost(host string) bool {
+	switch strings.ToLower(host) {
+	case "127.0.0.1", "localhost", "::1":
+		return true
+	default:
+		return false
+	}
+}
+
+func isWildcardHost(host string) bool {
+	return host == "0.0.0.0" || host == "::"
 }
 
 func printClientAdvice(class string) {
@@ -1340,7 +1546,10 @@ func printUsage() {
 	fmt.Println("  rpa init [flags]             (write config)")
 	fmt.Println("  rpa agent <cmd> [flags]      (remote forwards)")
 	fmt.Println("  rpa client <cmd> [flags]     (local forwards)")
-	fmt.Println("  rpa status|logs|metrics      (observability)")
+	fmt.Println("  rpa status                   (agent + client status)")
+	fmt.Println("  rpa logs [agent|client]      (logs, default: agent)")
+	fmt.Println("  rpa metrics [agent|client]   (metrics, default: agent)")
+	fmt.Println("  rpa doctor [agent|client]    (pre-flight checks)")
 	fmt.Println("")
 	fmt.Println("Quick help:")
 	fmt.Println("  rpa init --help")
@@ -1388,10 +1597,6 @@ func printClientUsage() {
 	fmt.Println("  rpa client add --local-forward spec --config rpa.yaml")
 	fmt.Println("  rpa client remove --local-forward spec --config rpa.yaml")
 	fmt.Println("  rpa client clear --config rpa.yaml")
-	fmt.Println("  rpa client status --config rpa.yaml")
-	fmt.Println("  rpa client logs --config rpa.yaml")
-	fmt.Println("  rpa client metrics --config rpa.yaml")
-	fmt.Println("  rpa client doctor --config rpa.yaml [--local-forward spec]")
 	fmt.Println("")
 	fmt.Println("Notes:")
 	fmt.Println("  up: install & start launchd service (persisted)")
@@ -1399,6 +1604,7 @@ func printClientUsage() {
 	fmt.Println("  add/remove: updates config and restarts running client if active")
 	fmt.Println("  clear: removes all forwards and stops the service")
 	fmt.Println("  prevent_sleep: set client.prevent_sleep=true to keep the system awake")
+	fmt.Println("  logs/metrics/doctor: use top-level commands (rpa logs|metrics|doctor)")
 	fmt.Println("")
 	fmt.Println("Local forward spec example:")
 	fmt.Println("  \"127.0.0.1:15432:127.0.0.1:5432\" (bind:localPort:remoteHost:remotePort)")
