@@ -29,6 +29,7 @@ type Options struct {
 	MonitorConfig      monitor.Config
 	PeriodicRestartSec int
 	DebounceMs         int
+	BuildInfo          map[string]any
 }
 
 type Runner struct {
@@ -156,6 +157,13 @@ func (r *Runner) RunWithLogger(logger *logging.Logger, build func() (*exec.Cmd, 
 	logger.Event("INFO", startEvent, map[string]any{
 		"summary": opts.Summary(),
 	})
+	if len(opts.BuildInfo) > 0 {
+		buildEvent := "build_info"
+		if opts.Kind != "" {
+			buildEvent = opts.Kind + "_build_info"
+		}
+		logger.Event("INFO", buildEvent, opts.BuildInfo)
+	}
 	defer logger.Event("INFO", stopEvent, nil)
 
 	r.setLogger(logger)

@@ -15,6 +15,7 @@ Common fields:
 
 Event-specific fields:
 - `agent_start`: `summary`
+- `agent_build_info`: `version`, `commit`, `build_time`, `go_version`
 - `ssh_started`: `summary`
 - `ssh_start_failed`: `error`
 - `ssh_exited`: `exit`, `class`, optional `stderr`
@@ -24,6 +25,7 @@ Event-specific fields:
 - `stop_during_backoff`: none
 - `agent_stop_requested`: none
 - `client_start`: `summary`
+- `client_build_info`: `version`, `commit`, `build_time`, `go_version`
 - `client_stop`: none
 - `client_stop_requested`: none
 - `restart_policy_stop`: `policy`, `class`, optional `reason`

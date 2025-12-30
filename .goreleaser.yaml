@@ -11,6 +11,8 @@ builds:
   - id: rpa
     main: ./cmd/rpa
     binary: rpa
+    ldflags:
+      - "-s -w -X reverse-proxy-agent/pkg/buildinfo.Version={{ .Version }} -X reverse-proxy-agent/pkg/buildinfo.Commit={{ .Commit }} -X reverse-proxy-agent/pkg/buildinfo.Date={{ .Date }}"
     env:
       - CGO_ENABLED=0
     goos:

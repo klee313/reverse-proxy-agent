@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"reverse-proxy-agent/internal/supervisor"
+	"reverse-proxy-agent/pkg/buildinfo"
 	"reverse-proxy-agent/pkg/config"
 	"reverse-proxy-agent/pkg/logging"
 	"reverse-proxy-agent/pkg/monitor"
@@ -75,8 +76,9 @@ func (c *Client) ConfigSummary() string {
 
 func (c *Client) RunWithLogger(logger *logging.Logger) error {
 	opts := supervisor.Options{
-		Kind:    "client",
-		Summary: c.ConfigSummary,
+		Kind:      "client",
+		Summary:   c.ConfigSummary,
+		BuildInfo: buildinfo.Fields(),
 		MonitorConfig: monitor.Config{
 			SleepCheckSec:  c.cfg.Client.SleepCheckSec,
 			SleepGapSec:    c.cfg.Client.SleepGapSec,
