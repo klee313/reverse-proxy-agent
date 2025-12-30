@@ -985,6 +985,7 @@ func runForegroundAgent(cfg *config.Config, label string) int {
 		fmt.Fprintf(os.Stderr, "logger init failed: %v\n", err)
 		return exitError
 	}
+	logger.SetConsoleWriter(os.Stdout)
 	startCaffeinate(logger, cfg.Agent.PreventSleep)
 
 	server, err := ipcserver.NewServer(cfg, agt, logs)
@@ -1035,6 +1036,7 @@ func runForegroundClient(cfg *config.Config, label string) int {
 		return exitError
 	}
 	logger.SetLevel(cfg.ClientLogging.Level)
+	logger.SetConsoleWriter(os.Stdout)
 	startCaffeinate(logger, cfg.Client.PreventSleep)
 
 	server, err := clientipcserver.NewServer(cfg, cli, logs)
@@ -1157,7 +1159,18 @@ func printStatusBlock(label string, cfg *config.Config, query func() statusPaylo
 		fmt.Printf("  last_trigger: %s\n", v)
 	}
 	if v, ok := resp.data["last_success_unix"]; ok && v != "" {
+		fmt.Printf("  last_success_utc: %s\n", formatUnixUTC(v))
 		fmt.Printf("  last_success_unix: %s\n", v)
+	}
+	if v, ok := resp.data["tcp_check"]; ok && v != "" {
+		fmt.Printf("  tcp_check: %s\n", v)
+	}
+	if v, ok := resp.data["tcp_check_error"]; ok && v != "" {
+		fmt.Printf("  tcp_check_error: %s\n", v)
+	}
+	if v, ok := resp.data["tcp_check_unix"]; ok && v != "" {
+		fmt.Printf("  tcp_check_utc: %s\n", formatUnixUTC(v))
+		fmt.Printf("  tcp_check_unix: %s\n", v)
 	}
 	if v, ok := resp.data["backoff_ms"]; ok && v != "" {
 		fmt.Printf("  backoff_ms: %s\n", v)
@@ -1194,12 +1207,25 @@ func printStatusFallback(label string, cfg *config.Config) bool {
 		fmt.Printf("  last_trigger: %s\n", snap.LastTrigger)
 	}
 	if snap.LastSuccessUnix > 0 {
+		fmt.Printf("  last_success_utc: %s\n", formatUnixUTC(strconv.FormatInt(snap.LastSuccessUnix, 10)))
 		fmt.Printf("  last_success_unix: %d\n", snap.LastSuccessUnix)
 	}
 	if snap.UpdatedUnix > 0 {
 		fmt.Printf("  updated_unix: %d\n", snap.UpdatedUnix)
 	}
 	return true
+}
+
+func formatUnixUTC(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	seconds, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return raw
+	}
+	return time.Unix(seconds, 0).UTC().Format(time.RFC3339)
 }
 
 func runLogs(args []string) int {

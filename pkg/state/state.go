@@ -23,7 +23,7 @@ func (s State) String() string {
 	case StateConnecting:
 		return "CONNECTING"
 	case StateConnected:
-		return "CONNECTED"
+		return "RUNNING"
 	default:
 		return "UNKNOWN"
 	}

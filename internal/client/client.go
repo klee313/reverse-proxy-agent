@@ -5,7 +5,9 @@ package client
 
 import (
 	"fmt"
+	"net"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -86,6 +88,8 @@ func (c *Client) RunWithLogger(logger *logging.Logger) error {
 		},
 		PeriodicRestartSec: c.cfg.Client.PeriodicRestartSec,
 		DebounceMs:         c.cfg.Client.Restart.DebounceMs,
+		TCPCheckSec:        c.cfg.SSH.CheckSec,
+		TCPCheckAddr:       net.JoinHostPort(c.cfg.SSH.Host, strconv.Itoa(c.cfg.SSH.Port)),
 	}
 	return c.runner.RunWithLogger(logger, func() (*exec.Cmd, error) {
 		return buildSSHCommand(c.cfg, c.currentLocalForwards())
@@ -118,6 +122,10 @@ func (c *Client) LastClass() string {
 
 func (c *Client) LastTriggerReason() string {
 	return c.runner.LastTriggerReason()
+}
+
+func (c *Client) TCPCheckStatus() (string, string, time.Time) {
+	return c.runner.TCPCheckStatus()
 }
 
 func (c *Client) StartSuccessCount() int {

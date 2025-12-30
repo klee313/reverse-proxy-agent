@@ -5,7 +5,9 @@ package agent
 
 import (
 	"fmt"
+	"net"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -74,6 +76,8 @@ func (a *Agent) RunWithLogger(logger *logging.Logger) error {
 		},
 		PeriodicRestartSec: a.cfg.Agent.PeriodicRestartSec,
 		DebounceMs:         a.cfg.Agent.Restart.DebounceMs,
+		TCPCheckSec:        a.cfg.SSH.CheckSec,
+		TCPCheckAddr:       net.JoinHostPort(a.cfg.SSH.Host, strconv.Itoa(a.cfg.SSH.Port)),
 	}
 	return a.runner.RunWithLogger(logger, func() (*exec.Cmd, error) {
 		return buildSSHCommand(a.cfg, a.currentRemoteForwards())
@@ -106,6 +110,10 @@ func (a *Agent) LastClass() string {
 
 func (a *Agent) LastTriggerReason() string {
 	return a.runner.LastTriggerReason()
+}
+
+func (a *Agent) TCPCheckStatus() (string, string, time.Time) {
+	return a.runner.TCPCheckStatus()
 }
 
 func (a *Agent) StartSuccessCount() int {

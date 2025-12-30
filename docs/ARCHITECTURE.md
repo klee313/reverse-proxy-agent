@@ -40,7 +40,7 @@ The recovery logic lives in `internal/supervisor`. The flow is:
 
 1) **Start attempt**
    - Build the SSH command (`internal/agent/ssh.go` or `internal/client/ssh.go`).
-   - Transition state to CONNECTING, then CONNECTED when the process starts.
+   - Transition state to CONNECTING, then RUNNING when the process starts.
    - Record start success/failure counters.
 
 2) **Success marking (grace period)**

@@ -38,7 +38,7 @@ Example:
 ### Status fields
 
 `rpa status` returns an `agent` section with:
-- `state`: `STOPPED|CONNECTING|CONNECTED`
+- `state`: `STOPPED|CONNECTING|RUNNING`
 - `summary`: `user@host:port`
 - `remote_forwards`: comma-separated remote forward specs (optional)
 - `uptime`: agent uptime
@@ -48,10 +48,13 @@ Example:
 - `last_class`: exit classification
 - `last_trigger`: last restart trigger reason
 - `last_success_unix`: unix timestamp of the last SSH session that stayed up past the success grace period (optional)
+- `tcp_check`: tcp reachability to the SSH host (`ok|failed|unknown`)
+- `tcp_check_error`: tcp check error message (optional)
+- `tcp_check_unix`: unix timestamp of the last tcp check (optional)
 - `backoff_ms`: current backoff (optional)
 
 `rpa status` returns a `client` section with:
-- `state`: `STOPPED|CONNECTING|CONNECTED`
+- `state`: `STOPPED|CONNECTING|RUNNING`
 - `summary`: `user@host:port (local=...)`
 - `local_forwards`: comma-separated local forward specs (optional)
 - `uptime`: client uptime
@@ -61,6 +64,9 @@ Example:
 - `last_class`: exit classification
 - `last_trigger`: last restart trigger reason
 - `last_success_unix`: unix timestamp of the last SSH session that stayed up past the success grace period (optional)
+- `tcp_check`: tcp reachability to the SSH host (`ok|failed|unknown`)
+- `tcp_check_error`: tcp check error message (optional)
+- `tcp_check_unix`: unix timestamp of the last tcp check (optional)
 - `backoff_ms`: current backoff (optional)
 
 ### Metrics keys

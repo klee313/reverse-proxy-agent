@@ -87,6 +87,7 @@ type SSHConfig struct {
 	RemoteForwards []string `yaml:"remote_forwards"`
 	IdentityFile   string   `yaml:"identity_file"`
 	Options        []string `yaml:"options"`
+	CheckSec       int      `yaml:"check_sec"`
 }
 
 type LoggingConfig struct {
@@ -204,6 +205,9 @@ func applyDefaults(cfg *Config) {
 	if cfg.SSH.Port == 0 {
 		cfg.SSH.Port = 22
 	}
+	if cfg.SSH.CheckSec == 0 {
+		cfg.SSH.CheckSec = 5
+	}
 	if cfg.SSH.Options == nil {
 		cfg.SSH.Options = []string{}
 	}
@@ -280,6 +284,9 @@ func validateCommon(cfg *Config) error {
 	}
 	if cfg.SSH.Port <= 0 {
 		return fmt.Errorf("ssh.port must be > 0 (got %d)", cfg.SSH.Port)
+	}
+	if cfg.SSH.CheckSec < 0 {
+		return fmt.Errorf("ssh.check_sec must be >= 0 (got %d)", cfg.SSH.CheckSec)
 	}
 	return nil
 }

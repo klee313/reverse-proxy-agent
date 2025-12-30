@@ -152,6 +152,15 @@ func (s *Server) handleStatus(conn net.Conn) {
 	if !s.agent.LastSuccess().IsZero() {
 		data["last_success_unix"] = fmt.Sprintf("%d", s.agent.LastSuccess().Unix())
 	}
+	if status, errMsg, at := s.agent.TCPCheckStatus(); status != "" {
+		data["tcp_check"] = status
+		if errMsg != "" {
+			data["tcp_check_error"] = errMsg
+		}
+		if !at.IsZero() {
+			data["tcp_check_unix"] = fmt.Sprintf("%d", at.Unix())
+		}
+	}
 	if backoff := s.agent.CurrentBackoff(); backoff > 0 {
 		data["backoff_ms"] = fmt.Sprintf("%d", backoff.Milliseconds())
 	}

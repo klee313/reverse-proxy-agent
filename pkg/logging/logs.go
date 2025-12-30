@@ -6,6 +6,7 @@ package logging
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -50,10 +51,11 @@ func (r *LogBuffer) List() []string {
 }
 
 type Logger struct {
-	path  string
-	ring  *LogBuffer
-	mu    sync.Mutex
-	level zerolog.Level
+	path    string
+	ring    *LogBuffer
+	mu      sync.Mutex
+	level   zerolog.Level
+	console io.Writer
 }
 
 func NewLogger(cfg *config.Config, ring *LogBuffer) (*Logger, error) {
@@ -116,6 +118,9 @@ func (l *Logger) Event(level, event string, fields map[string]any) {
 	if l.ring != nil {
 		l.ring.Add(line)
 	}
+	if l.console != nil {
+		_, _ = l.console.Write([]byte(line + "\n"))
+	}
 }
 
 func parseLevel(level string) zerolog.Level {
@@ -135,4 +140,10 @@ func parseLevel(level string) zerolog.Level {
 
 func (l *Logger) SetLevel(level string) {
 	l.level = parseLevel(level)
+}
+
+func (l *Logger) SetConsoleWriter(w io.Writer) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.console = w
 }

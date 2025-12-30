@@ -185,6 +185,7 @@ ssh:
   user: "ubuntu"
   host: "example.com"
   port: 22
+  check_sec: 5
   remote_forwards:
     - "0.0.0.0:2222:localhost:22"
     - "0.0.0.0:2223:localhost:23"
@@ -205,6 +206,7 @@ client_logging:
 메모:
 - `ssh.remote_forwards`는 중복 제거됩니다.
 - 기본 SSH 옵션에 `ServerAlive*`와 `StrictHostKeyChecking=accept-new`가 포함됩니다(이미 지정한 경우 유지).
+- `ssh.check_sec`은 SSH 호스트 TCP 체크 주기이며 `rpa status`에 표시됩니다.
 - `agent clear`는 포워드를 모두 제거하고 서비스도 내려갑니다.
 
 ## 관측성

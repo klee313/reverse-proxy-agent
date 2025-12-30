@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"strings"
@@ -30,6 +31,8 @@ type Options struct {
 	PeriodicRestartSec int
 	DebounceMs         int
 	BuildInfo          map[string]any
+	TCPCheckSec        int
+	TCPCheckAddr       string
 }
 
 type Runner struct {
@@ -60,17 +63,23 @@ type Runner struct {
 	exitFailureCount  int
 	lastTriggerReason string
 
+	tcpCheckStatus string
+	tcpCheckError  string
+	lastTCPCheck   time.Time
+
 	stateWriter func(statefile.Snapshot)
 }
 
 const successGracePeriod = 2 * time.Second
+const tcpCheckTimeout = 3 * time.Second
 
 func New(policy restart.Policy, backoff *restart.Backoff) *Runner {
 	return &Runner{
-		sm:      state.NewStateMachine(),
-		stopCh:  make(chan struct{}),
-		policy:  policy,
-		backoff: backoff,
+		sm:             state.NewStateMachine(),
+		stopCh:         make(chan struct{}),
+		policy:         policy,
+		backoff:        backoff,
+		tcpCheckStatus: "unknown",
 	}
 }
 
@@ -187,6 +196,13 @@ func (r *Runner) RunWithLogger(logger *logging.Logger, build func() (*exec.Cmd, 
 			r.triggerRestart(logger, reason, opts.DebounceMs)
 		})
 	}()
+	if opts.TCPCheckSec > 0 && strings.TrimSpace(opts.TCPCheckAddr) != "" {
+		eventWG.Add(1)
+		go func() {
+			defer eventWG.Done()
+			r.tcpCheckLoop(monitorCtx, time.Duration(opts.TCPCheckSec)*time.Second, opts.TCPCheckAddr)
+		}()
+	}
 
 	var periodicStop chan struct{}
 	if opts.PeriodicRestartSec > 0 {
@@ -477,6 +493,12 @@ func (r *Runner) LastTriggerReason() string {
 	return r.lastTriggerReason
 }
 
+func (r *Runner) TCPCheckStatus() (string, string, time.Time) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.tcpCheckStatus, r.tcpCheckError, r.lastTCPCheck
+}
+
 func (r *Runner) StartSuccessCount() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -546,6 +568,47 @@ func (r *Runner) setLastTriggerReason(reason string) {
 	snap := r.snapshotLocked()
 	r.mu.Unlock()
 	r.writeSnapshot(writer, snap)
+}
+
+func (r *Runner) tcpCheckLoop(ctx context.Context, interval time.Duration, addr string) {
+	if interval <= 0 {
+		return
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+		if r.State() != state.StateConnected {
+			continue
+		}
+		r.recordTCPCheck(tcpCheck(addr))
+	}
+}
+
+func (r *Runner) recordTCPCheck(err error) {
+	r.mu.Lock()
+	r.lastTCPCheck = time.Now()
+	if err != nil {
+		r.tcpCheckStatus = "failed"
+		r.tcpCheckError = err.Error()
+	} else {
+		r.tcpCheckStatus = "ok"
+		r.tcpCheckError = ""
+	}
+	r.mu.Unlock()
+}
+
+func tcpCheck(addr string) error {
+	conn, err := net.DialTimeout("tcp", addr, tcpCheckTimeout)
+	if err != nil {
+		return err
+	}
+	return conn.Close()
 }
 
 func (r *Runner) SetStateWriter(writer func(statefile.Snapshot)) {
