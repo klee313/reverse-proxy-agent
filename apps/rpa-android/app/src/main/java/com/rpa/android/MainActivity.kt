@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -376,6 +377,7 @@ fun QuickNotes(notes: List<String>) {
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun LogsScreen(padding: PaddingValues, logs: List<LogLine>) {
     val context = LocalContext.current
     var query by remember { mutableStateOf("") }
