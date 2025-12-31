@@ -15,7 +15,7 @@
             android:name="preloaded_fonts"
             android:resource="@array/preloaded_fonts" />
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -23,7 +23,7 @@
             </intent-filter>
         </activity>
         <service
-            android:name=".RpaService"
+            android:name=".tunnel.RpaService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
     </application>

@@ -1,4 +1,4 @@
-package com.rpa.android
+package com.rpa.android.ui
 
 import android.content.ClipData
 import android.content.ClipboardManager

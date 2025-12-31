@@ -1,8 +1,11 @@
-package com.rpa.android
+package com.rpa.android.tunnel
 
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
+import com.rpa.android.core.MetricsStore
+import com.rpa.android.core.ServiceState
+import com.rpa.android.data.RpaConfig
 import net.schmizz.sshj.AndroidConfig
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.connection.channel.direct.LocalPortForwarder

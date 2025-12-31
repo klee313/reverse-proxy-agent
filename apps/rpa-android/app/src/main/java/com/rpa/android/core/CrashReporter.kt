@@ -1,6 +1,7 @@
-package com.rpa.android
+package com.rpa.android.core
 
 import android.content.Context
+import com.rpa.android.data.LogStore
 import java.io.File
 import java.time.Instant
 import java.time.ZoneId

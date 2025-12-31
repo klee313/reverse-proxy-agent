@@ -1,4 +1,4 @@
-package com.rpa.android
+package com.rpa.android.tunnel
 
 object ErrorClassifier {
     fun classify(message: String?): String {

@@ -1,4 +1,4 @@
-package com.rpa.android
+package com.rpa.android.data
 
 import android.content.Context
 import org.yaml.snakeyaml.Yaml

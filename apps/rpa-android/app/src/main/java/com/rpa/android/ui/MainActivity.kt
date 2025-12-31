@@ -1,4 +1,4 @@
-package com.rpa.android
+package com.rpa.android.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -61,6 +61,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.rpa.android.R
+import com.rpa.android.core.CrashReporter
+import com.rpa.android.core.CryptoProvider
+import com.rpa.android.core.DoctorItem
+import com.rpa.android.core.LogLine
+import com.rpa.android.core.MetricItem
+import com.rpa.android.core.MetricsStore
+import com.rpa.android.core.ServiceEvents
+import com.rpa.android.core.ServiceState
+import com.rpa.android.data.ConfigStore
+import com.rpa.android.data.KeyStore
+import com.rpa.android.feature.doctor.DoctorChecks
+import com.rpa.android.tunnel.RpaServiceController
 import com.rpa.android.ui.theme.RpaTheme
 import java.time.Instant
 import java.time.ZoneOffset
@@ -96,23 +109,6 @@ data class StatusSnapshot(
     val lastSuccessUtc: String,
     val tcpCheck: String,
     val tcpCheckError: String,
-)
-
-data class LogLine(
-    val timestamp: String,
-    val level: String,
-    val message: String,
-)
-
-data class MetricItem(
-    val key: String,
-    val value: String,
-)
-
-data class DoctorItem(
-    val title: String,
-    val status: String,
-    val detail: String,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)

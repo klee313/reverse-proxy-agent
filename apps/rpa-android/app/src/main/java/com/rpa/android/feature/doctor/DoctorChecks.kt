@@ -1,6 +1,10 @@
-package com.rpa.android
+package com.rpa.android.feature.doctor
 
 import android.content.Context
+import com.rpa.android.core.DoctorItem
+import com.rpa.android.core.MetricsStore
+import com.rpa.android.core.ServiceState
+import com.rpa.android.data.ConfigStore
 import java.io.File
 import java.net.InetSocketAddress
 import java.net.Socket

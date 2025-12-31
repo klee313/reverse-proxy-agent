@@ -1,4 +1,4 @@
-package com.rpa.android
+package com.rpa.android.tunnel
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -12,6 +12,15 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import com.rpa.android.R
+import com.rpa.android.core.CrashReporter
+import com.rpa.android.core.CryptoProvider
+import com.rpa.android.core.MetricsStore
+import com.rpa.android.core.ServiceEvents
+import com.rpa.android.core.ServiceState
+import com.rpa.android.core.ServiceStatus
+import com.rpa.android.data.ConfigStore
+import com.rpa.android.data.KeyStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -174,15 +183,4 @@ class RpaService : Service() {
         const val NOTIFICATION_ID = 1001
         const val ACTION_STOP = "com.rpa.android.ACTION_STOP"
     }
-}
-
-data class ServiceStatus(
-    val state: ServiceState = ServiceState.STOPPED,
-    val detail: String = "Idle"
-)
-
-enum class ServiceState(val label: String) {
-    STOPPED("STOPPED"),
-    CONNECTING("CONNECTING"),
-    RUNNING("RUNNING"),
 }

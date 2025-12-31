@@ -1,4 +1,4 @@
-package com.rpa.android
+package com.rpa.android.core
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

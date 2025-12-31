@@ -1,9 +1,10 @@
-package com.rpa.android
+package com.rpa.android.tunnel
 
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import com.rpa.android.core.ServiceEvents
 
 class NetworkMonitor(
     context: Context,

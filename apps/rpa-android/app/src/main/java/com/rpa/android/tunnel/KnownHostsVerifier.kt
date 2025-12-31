@@ -1,4 +1,4 @@
-package com.rpa.android
+package com.rpa.android.tunnel
 
 import net.schmizz.sshj.common.KeyType
 import net.schmizz.sshj.transport.verification.OpenSSHKnownHosts

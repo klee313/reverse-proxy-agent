@@ -1,6 +1,7 @@
-package com.rpa.android
+package com.rpa.android.data
 
 import android.content.Context
+import com.rpa.android.core.ServiceEvents
 import android.util.Base64
 import java.io.File
 import java.security.KeyPair

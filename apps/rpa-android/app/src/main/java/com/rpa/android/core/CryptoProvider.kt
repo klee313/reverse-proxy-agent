@@ -1,4 +1,4 @@
-package com.rpa.android
+package com.rpa.android.core
 
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.security.Security

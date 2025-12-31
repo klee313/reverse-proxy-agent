@@ -1,5 +1,6 @@
-package com.rpa.android
+package com.rpa.android.core
 
+import com.rpa.android.data.LogStore
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

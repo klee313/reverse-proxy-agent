@@ -8,6 +8,11 @@ reverse proxy / ssh tunnel agent입니다.
 
 - ngrok, tailscale 역시 훌륭한 솔루션이지만, 홈서버 운영 환경에서 '불특정 다수에게 노출하지 않고'
   '특정 사용자에게만 접근을 허용'하는 설정을 아주 가볍게 하기는 쉽지 않습니다.
+- 특히 tailscale은 Funnel/공유 기능의 사용성과 편의성이 높지만, 설정/권한 구조가 rpa가 지향하는
+  "SSH 기반으로 최소 권한만 주는 접근"과는 조금 다릅니다. 이 README의 예시들도 그런 Funnel 방식의
+  사용자 경험과 비교되는 포인트를 염두에 두고 작성되었습니다.
+- tailscale을 여러 사용자가 안정적으로 쓰려면 유료 플랜이 필요한 경우가 많습니다. 반면 rpa는
+  SSH 인스턴스 하나만 있으면, 그 인스턴스에 접근 가능한 사용자라면 인원수 제한 없이 확장할 수 있습니다.
 - 이 프로젝트는 SSH 기반으로 좁은 범위(선별된 사용자)의 접근만 허용하는 용도로 설계되었습니다.
 
 ## Use cases
@@ -145,12 +150,20 @@ cd apps/rpa
 go test ./...
 ```
 
+개발 진행 과정은 `docs/archive` 문서들을 통해 확인할 수 있습니다.
+
 ## Android 앱
 
-Android 앱은 `apps/rpa-android`에 있습니다.
+Android 앱은 `apps/rpa-android`에 있습니다. 모바일에서 rpa client를 더 자연스럽고 안정적으로 쓰기 위해
+Go 바이너리 대신 Android 네이티브 기술스택으로 구현한 전용 클라이언트입니다. 폰에서 SSH 터널을 유지하고
+상태/로그/설정을 관리할 수 있게 하여, 데스크톱에서 하던 rpa client 작업을 모바일에서도 동일하게 수행할 수 있도록
+설계되었습니다.
 
 ### 기술 스택
-- Kotlin
-- Jetpack Compose (UI)
-- Material 3
-- Foreground Service (상태바 알림 포함)
+- Kotlin: 앱 전체 로직 구현
+- Coroutines/Flow: 터널 상태, 로그 스트림, 백그라운드 작업 처리
+- Jetpack Compose: 상태/로그/설정/메트릭/닥터 화면 UI
+- Material 3: UI 컴포넌트와 테마
+- Foreground Service: 터널을 백그라운드에서 유지하고 상태바 알림 제공
+- SSHJ: SSH 연결 및 로컬 포워딩
+- SnakeYAML: rpa.yaml 파싱/검증
