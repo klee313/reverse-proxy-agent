@@ -27,7 +27,8 @@ class NetworkMonitor(
     }
 
     fun register() {
-        connectivityManager.registerDefaultNetworkCallback(callback)
+        runCatching { connectivityManager.registerDefaultNetworkCallback(callback) }
+            .onFailure { ServiceEvents.log("ERROR", "network callback failed: ${it.message}") }
     }
 
     fun unregister() {
