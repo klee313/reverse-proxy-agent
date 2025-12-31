@@ -1,1 +1,4 @@
 node_modules/
+
+# Android signing
+apps/rpa-android/*.keystore

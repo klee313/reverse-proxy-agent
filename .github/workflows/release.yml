@@ -55,16 +55,27 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Build APK (unsigned release)
+      - name: Decode Android keystore
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/rpa.keystore"
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+
+      - name: Build APK (release)
         working-directory: apps/rpa-android
         run: ./gradlew assembleRelease
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/rpa.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
       - name: Rename APK
-        run: mv apps/rpa-android/app/build/outputs/apk/release/app-release-unsigned.apk apps/rpa-android/app/build/outputs/apk/release/rpa-android-${{ github.ref_name }}-release-unsigned.apk
+        run: mv apps/rpa-android/app/build/outputs/apk/release/app-release.apk apps/rpa-android/app/build/outputs/apk/release/rpa-android-${{ github.ref_name }}-release.apk
 
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: apps/rpa-android/app/build/outputs/apk/release/rpa-android-${{ github.ref_name }}-release-unsigned.apk
+          files: apps/rpa-android/app/build/outputs/apk/release/rpa-android-${{ github.ref_name }}-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
