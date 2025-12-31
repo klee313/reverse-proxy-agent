@@ -3,12 +3,14 @@ package com.rpa.android
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
+import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.connection.channel.direct.LocalPortForwarder
 import net.schmizz.sshj.connection.channel.direct.Parameters
-import net.schmizz.sshj.transport.kex.DHG14
-import net.schmizz.sshj.transport.kex.DHG14SHA256
 import net.schmizz.sshj.transport.kex.DHG1
+import net.schmizz.sshj.transport.kex.DHG14
+import net.schmizz.sshj.transport.kex.DHGexSHA1
+import net.schmizz.sshj.transport.kex.DHGexSHA256
 import java.io.IOException
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -89,10 +91,22 @@ class SshTunnelManager(
     }
 
     private fun connect(config: RpaConfig, keyPair: KeyPair) {
-        val ssh = SSHClient()
-        // Avoid X25519 on Android where BC provider may not support it.
-        ssh.setKeyExchangeFactories(listOf(DHG14SHA256(), DHG14(), DHG1()))
-        logCallback("INFO", "kex: diffie-hellman-group14-sha256, diffie-hellman-group14-sha1, diffie-hellman-group1-sha1")
+        val sshConfig = DefaultConfig().apply {
+            // Avoid X25519 on Android where BC provider may not support it.
+            setKeyExchangeFactories(
+                listOf(
+                    DHG14.Factory(),
+                    DHGexSHA256.Factory(),
+                    DHGexSHA1.Factory(),
+                    DHG1.Factory()
+                )
+            )
+        }
+        val ssh = SSHClient(sshConfig)
+        logCallback(
+            "INFO",
+            "kex: diffie-hellman-group14-sha1, diffie-hellman-group-exchange-sha256, diffie-hellman-group-exchange-sha1, diffie-hellman-group1-sha1"
+        )
         val hostVerifier = AcceptNewKnownHosts(knownHostsFile) { msg -> logCallback("WARN", msg) }
         ssh.addHostKeyVerifier(hostVerifier)
         ssh.setConnectTimeout(15000)
