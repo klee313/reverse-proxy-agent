@@ -1,41 +1,6 @@
-## Observability
+# Observability
 
-This document describes the log and metrics schema exposed by rpa.
-Success grace period: 2 seconds (used before marking `last_success_unix`).
-
-### Logs (JSON lines)
-
-The agent writes one JSON object per line.
-
-Common fields:
-- `ts`: RFC3339 timestamp
-- `level`: `INFO` or `ERROR`
-- `event`: event name
-- `msg`: optional human-readable message
-
-Event-specific fields:
-- `agent_start`: `summary`
-- `agent_build_info`: `version`, `commit`, `build_time`, `go_version`
-- `ssh_started`: `summary`
-- `ssh_start_failed`: `error`
-- `ssh_exited`: `exit`, `class`, optional `stderr`
-- `restart_triggered`: `reason`
-- `restart_skipped`: `reason`, `detail`
-- `restart_scheduled`: `delay_ms`
-- `stop_during_backoff`: none
-- `agent_stop_requested`: none
-- `client_start`: `summary`
-- `client_build_info`: `version`, `commit`, `build_time`, `go_version`
-- `client_stop`: none
-- `client_stop_requested`: none
-- `restart_policy_stop`: `policy`, `class`, optional `reason`
-
-Example:
-```json
-{"ts":"2025-01-01T00:00:00Z","level":"INFO","event":"ssh_started","summary":"user@host:22"}
-```
-
-### Status fields
+## Status
 
 `rpa status` returns an `agent` section with:
 - `state`: `STOPPED|CONNECTING|RUNNING`

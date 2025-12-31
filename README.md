@@ -1,66 +1,20 @@
-# Reverse Proxy Agent (rpa)
+# reverse-proxy-agent (rpa)
 
-rpa는 macOS에서 SSH 터널(원격 포워드/로컬 포워드)을 안정적으로 유지하기 위한 CLI입니다.
-launchd 서비스 모드와 포그라운드 실행을 모두 지원하고, sleep/network 이벤트에 따라 자동 재시작합니다.
+"내 홈서버를 외부에 노출하고 싶은데, 불특정 다수의 접속은 허용하지 않으면서
+선별된 사용자에게만 SSH 기반 접근을 허용하고 싶다" 라는 목적을 위한
+reverse proxy / ssh tunnel agent입니다.
 
-## 기능
+## Why not `ngrok` / `tailscale`?
 
-- Agent(원격 포워드) 모드: `agent up/down/run`, 동적 포워드 add/remove/clear
-- Client(로컬 포워드) 모드: `client up/down/run/add/remove/clear`, 진단 `doctor client`
-- launchd 서비스 모드 지원
-- JSON 로그, status/metrics 제공
-- 설정 파일 기반 운영
+- ngrok, tailscale 역시 훌륭한 솔루션이지만, 홈서버 운영 환경에서 '불특정 다수에게 노출하지 않고'
+  '특정 사용자에게만 접근을 허용'하는 설정을 아주 가볍게 하기는 쉽지 않습니다.
+- 이 프로젝트는 SSH 기반으로 좁은 범위(선별된 사용자)의 접근만 허용하는 용도로 설계되었습니다.
 
-## 왜 rpa인가
+## Use cases
 
-rpa는 SSH 자체를 대체하려는 도구가 아니라, **운영 환경에서 “SSH 터널을 항상 살아 있게 유지”해야 하는 요구**에 최적화된 실행 도구입니다.
-일회성 터널을 여는 것보다, *끊김·슬립·네트워크 변경이 반복되는 환경*에서 터널이 안정적으로 유지되는 것이 더 중요할 때 특히 효과적입니다.
-
-다음과 같은 상황에서 유즈케이스가 특히 강합니다.
-
-- 운영 중인 서버/DB에 **항상 열려 있는 터널**이 필요하고, 사용자는 수동 복구에 관여하고 싶지 않을 때
-- macOS 환경에서 **launchd 기반 상시 서비스**로 터널을 관리하고 싶을 때
-- sleep/wake, Wi‑Fi/VPN 전환 등 **로컬 환경 변동**이 많아도 자동 복구가 보장돼야 할 때
-- “무엇이 왜 끊겼는지”를 **status/logs/metrics만으로 설명 가능한 상태**가 필요할 때
-- 홈서버 개발 테스트에서 ngrok, Tailscale Funnel 같은 대안이 있지만, **불특정 다수로부터의 홈서버 트래픽은 전혀 허용하지 않으려는 요구**가 있을 때
-
-다른 프로젝트 대비 rpa가 필요한 이유는 다음과 같습니다.
-
-- **운영 친화성에 집중**: 단순한 포워딩 기능보다 “끊기지 않는 터널”을 우선 목표로 설계
-- **관측 가능성 내장**: 상태/지표/로그가 기본 제공되어 운영자가 상황을 빠르게 판단 가능
-- **macOS 최적화**: launchd 기반으로 설치/실행 흐름을 일관되게 제공
-- **불필요한 복잡성 제거**: 별도 중앙 서버 애플리케이션 없이 SSH만으로 동작
-
-즉, rpa는 “어떻게 터널을 여느냐”보다 **“운영 환경에서 어떻게 안정적으로 유지하느냐”**에 집중한 도구입니다.
-
-## 중앙 서버(원격 SSH 서버) 준비
-
-이 프로젝트에 별도의 “중앙 서버” 애플리케이션은 없습니다. 대신 **SSH 서버**가 필요합니다.
-아래는 일반적인 Linux 서버 기준 설정 예시입니다.
-
-1) SSH 서버 설치/활성화
-```sh
-sudo apt-get update
-sudo apt-get install -y openssh-server
-sudo systemctl enable --now ssh
-```
-
-2) 포워딩 허용 설정
-`/etc/ssh/sshd_config`에서 다음 항목을 확인/설정한 뒤 재시작하세요.
-```
-AllowTcpForwarding yes
-GatewayPorts yes
-```
-```sh
-sudo systemctl restart ssh
-```
-
-3) 방화벽/보안그룹
-- 원격 포워드로 열려는 포트가 외부에서 접근 가능하도록 방화벽을 열어야 합니다.
-- AWS/GCP 등에서는 보안그룹 인바운드 규칙도 확인하세요.
-
-4) 키 기반 접속
-- 로컬에서 `ssh user@host`가 비밀번호 없이 접속되는지 확인하세요.
+- 홈서버 개발 테스트 환경에서 외부 접속을 열고 싶을 때
+- 개인 서버를 특정 인원에게만 공개하고 싶을 때
+- SSH 터널을 항상 살아있도록 관리하고 싶은 경우
 
 ## 설치
 
@@ -73,6 +27,7 @@ mv rpa /usr/local/bin/
 
 ### 소스에서 빌드
 ```sh
+cd apps/rpa
 go build -o rpa ./cmd/rpa
 ```
 
@@ -88,62 +43,21 @@ rpa init \
 rpa agent up
 rpa status
 rpa logs --follow
-rpa agent down
 ```
 
-### Client (로컬 포워드, init 후 한 줄 실행)
+### Client (로컬 포워드)
 ```sh
 rpa init \
   --ssh-user ubuntu \
   --ssh-host example.com \
   --local-forward "127.0.0.1:15432:127.0.0.1:5432"
 
-rpa client run
-```
-
-### Client (서비스 모드)
-```sh
 rpa client up
-rpa logs [agent|client]
-rpa metrics [agent|client]
-rpa client down
+rpa status
+rpa logs --follow
 ```
 
-## 명령어
-
-```
-rpa init --ssh-user user --ssh-host host --remote-forward spec [--config path]
-rpa init --ssh-user user --ssh-host host --local-forward spec [--config path]
-
-rpa agent up --config path
-rpa agent down --config path
-rpa agent run --config path
-rpa agent add --remote-forward spec --config path
-rpa agent remove --remote-forward spec --config path
-rpa agent clear --config path
-
-rpa client up --config path [--local-forward spec]
-rpa client down --config path
-rpa client run --config path [--local-forward spec]
-rpa client add --local-forward spec --config path
-rpa client remove --local-forward spec --config path
-rpa client clear --config path
-rpa logs [agent|client] --config path
-rpa metrics [agent|client] --config path
-rpa doctor [client] --config path
-rpa doctor [agent|client] --config path [--remote-forward spec | --local-forward spec]
-rpa config show --config path
-rpa config get <key> --config path
-rpa config set <key> <value> --config path
-
-rpa status --config path
-rpa logs --config path [--follow|-f]
-rpa metrics --config path
-```
-
-## 설정 파일
-
-기본 경로: `~/.rpa/rpa.yaml` (`--config` 또는 `RPA_CONFIG`로 변경 가능)
+## 구성 예시
 
 ```yaml
 agent:
@@ -227,5 +141,16 @@ git push origin v0.1.0
 ## 개발
 
 ```sh
+cd apps/rpa
 go test ./...
 ```
+
+## Android 앱
+
+Android 앱은 `apps/rpa-android`에 있습니다.
+
+### 기술 스택
+- Kotlin
+- Jetpack Compose (UI)
+- Material 3
+- Foreground Service (상태바 알림 포함)

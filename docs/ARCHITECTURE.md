@@ -1,45 +1,30 @@
-## Architecture and Recovery Logic
+# Architecture
 
-This document explains how the rpa codebase is structured and how the recovery
-logic works in detail.
+This document describes key components of rpa and how recovery works.
 
-### Overview
+## Components
 
-rpa keeps SSH tunnels alive for two modes:
-- **Agent**: remote forward tunnels (server-side listeners).
-- **Client**: local forward tunnels (local listeners).
+`apps/rpa/internal/supervisor` drives process lifecycle, recovery policy, and monitoring.
 
-Both modes share the same supervision core so behavior is consistent:
-`internal/supervisor` drives process lifecycle, recovery policy, and monitoring.
-
-### Core components
-
-- `internal/supervisor`
-  - Owns the SSH process lifecycle, state machine, and recovery policy.
-  - Emits structured logs (JSON) and tracks metrics (restart counts, last exit).
-- `internal/agent` / `internal/client`
-  - Wrap the supervisor and build SSH commands for each mode.
-  - Provide runtime mutation of forwards (add/remove/clear) and trigger restarts.
-- `pkg/monitor`
-  - Detects sleep/wake and network change events.
-  - On macOS with cgo enabled it uses native frameworks.
-  - When cgo is disabled or on non-darwin, it falls back to polling.
-- Sleep prevention (optional):
-  - `agent.prevent_sleep` / `client.prevent_sleep` wraps the runtime with
-    `caffeinate` to keep the system awake while tunnels are running.
-- `pkg/restart`
+- `apps/rpa/internal/supervisor`
+  - Supervisor loop, restart policy, backoff handling.
+- `apps/rpa/internal/agent` / `apps/rpa/internal/client`
+  - Agent and client runtime entry points.
+- `apps/rpa/pkg/monitor`
+  - Sleep/network monitoring hooks.
+- `apps/rpa/pkg/restart`
   - Backoff policy with exponential delay, jitter, and debounce window.
-- `pkg/sshutil`
+- `apps/rpa/pkg/sshutil`
   - Buffers SSH stderr and classifies exit failures for diagnostics.
-- `pkg/ipc`
+- `apps/rpa/pkg/ipc`
   - Unix socket RPC for status/logs/metrics and runtime config changes.
 
-### Recovery logic (detailed)
+## Recovery logic (detailed)
 
-The recovery logic lives in `internal/supervisor`. The flow is:
+The recovery logic lives in `apps/rpa/internal/supervisor`. The flow is:
 
 1) **Start attempt**
-   - Build the SSH command (`internal/agent/ssh.go` or `internal/client/ssh.go`).
+   - Build the SSH command (`apps/rpa/internal/agent/ssh.go` or `apps/rpa/internal/client/ssh.go`).
    - Transition state to CONNECTING, then RUNNING when the process starts.
    - Record start success/failure counters.
 
@@ -59,42 +44,15 @@ The recovery logic lives in `internal/supervisor`. The flow is:
      - User-facing hints (`client run` and `doctor`).
      - Policy decisions (stop vs retry).
 
-5) **Policy and backoff**
-   - Policies:
-     - `always`: retry on any exit.
-     - `on-failure`: retry only on non-zero exit.
-   - Certain classes (`auth`, `hostkey`) stop immediately to avoid infinite
-     retries that require manual action.
-   - Backoff:
-     - Exponential delay with min/max, factor, and jitter.
-     - Reset when a clean exit occurs.
-   - Debounce:
-     - Prevents repeated restarts from the same burst of triggers.
+5) **Backoff and restart**
+   - Backoff delay uses exponential policy with jitter.
+   - Policy determines if restarts happen on all exits or only on failures.
 
-6) **Periodic restart (optional)**
-   - A periodic timer can trigger restarts to avoid long-lived half-dead states.
+## Key files
 
-### Runtime updates
-
-- `agent add/remove/clear` and `client add/remove/clear` modify the config on
-  disk and also attempt to update the running process via IPC.
-- If the daemon is running, it restarts the SSH process to apply new forwards.
-- If the daemon is not running, changes are persisted and take effect on next
-  start.
-- `clear` removes all forwards and stops the service (agent/client).
-
-### Observability
-
-- Logs are JSON lines for easy ingestion.
-- `status` returns state, uptime, restart counts, last exit, last success time.
-- `metrics` exports counters and timestamps suitable for scraping.
-- Detailed schema: `docs/OBSERVABILITY.md`.
-
-### File map (entry points)
-
-- CLI entry: `cmd/rpa/main.go`
-- CLI routing: `internal/cli/cli.go`
-- Agent runtime: `internal/agent/agent.go`, `internal/agent/ssh.go`
-- Client runtime: `internal/client/client.go`, `internal/client/ssh.go`
-- Supervisor core: `internal/supervisor/supervisor.go`
-- IPC servers: `internal/agent/ipc/server.go`, `internal/client/ipc/server.go`
+- CLI entry: `apps/rpa/cmd/rpa/main.go`
+- CLI routing: `apps/rpa/internal/cli/cli.go`
+- Agent runtime: `apps/rpa/internal/agent/agent.go`, `apps/rpa/internal/agent/ssh.go`
+- Client runtime: `apps/rpa/internal/client/client.go`, `apps/rpa/internal/client/ssh.go`
+- Supervisor core: `apps/rpa/internal/supervisor/supervisor.go`
+- IPC servers: `apps/rpa/internal/agent/ipc/server.go`, `apps/rpa/internal/client/ipc/server.go`
