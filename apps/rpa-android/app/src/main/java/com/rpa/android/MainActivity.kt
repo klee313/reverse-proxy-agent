@@ -376,7 +376,9 @@ fun QuickNotes(notes: List<String>) {
 @Composable
 fun LogsScreen(padding: PaddingValues, logs: List<LogLine>) {
     var query by remember { mutableStateOf("") }
-    val filtered = logs.filter { it.message.contains(query, ignoreCase = true) }
+    val filtered = logs
+        .filter { it.message.contains(query, ignoreCase = true) }
+        .asReversed()
 
     Column(
         modifier = Modifier
