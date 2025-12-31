@@ -33,6 +33,7 @@ class RpaService : Service() {
     override fun onCreate() {
         super.onCreate()
         CrashReporter.init(this)
+        CryptoProvider.install()
         ServiceEvents.init(this)
         createNotificationChannel()
         updateStatus(ServiceState.CONNECTING, "Starting tunnel")

@@ -79,6 +79,7 @@ dependencies {
     implementation("com.google.android.material:material:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
     implementation("com.hierynomus:sshj:0.38.0")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
     implementation("org.yaml:snakeyaml:2.2")
 
     implementation(platform("androidx.compose:compose-bom:2024.02.01"))

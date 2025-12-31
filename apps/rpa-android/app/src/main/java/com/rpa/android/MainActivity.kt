@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -65,6 +66,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         CrashReporter.init(this)
+        CryptoProvider.install()
         setContent {
             RpaTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -375,6 +377,7 @@ fun QuickNotes(notes: List<String>) {
 
 @Composable
 fun LogsScreen(padding: PaddingValues, logs: List<LogLine>) {
+    val context = LocalContext.current
     var query by remember { mutableStateOf("") }
     val filtered = logs
         .filter { it.message.contains(query, ignoreCase = true) }
@@ -396,8 +399,14 @@ fun LogsScreen(padding: PaddingValues, logs: List<LogLine>) {
         Spacer(modifier = Modifier.height(12.dp))
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(filtered) { log ->
+                val line = "${log.timestamp}  ${log.level}  ${log.message}"
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .combinedClickable(
+                            onClick = {},
+                            onLongClick = { ShareHelper.copy(context, "rpa log", line) }
+                        ),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
