@@ -6,7 +6,7 @@ import java.net.InetSocketAddress
 import java.net.Socket
 
 object DoctorChecks {
-    fun run(context: Context): List<DoctorItem> {
+    fun run(context: Context, state: ServiceState): List<DoctorItem> {
         val configText = ConfigStore.loadText(context)
         val configResult = runCatching { ConfigStore.parse(configText) }
         val items = mutableListOf<DoctorItem>()
@@ -35,6 +35,13 @@ object DoctorChecks {
         )
 
         val forwardChecks = config.client.localForwards.map { spec ->
+            if (state != ServiceState.STOPPED) {
+                return@map DoctorItem(
+                    "Forward ${spec}",
+                    "INFO",
+                    "skipped while running"
+                )
+            }
             val result = runCatching { canBindLocalForward(spec) }
             DoctorItem(
                 "Forward ${spec}",
@@ -44,14 +51,18 @@ object DoctorChecks {
         }
         items.addAll(forwardChecks)
 
-        val hostReachable = runCatching { canConnect(config.ssh.host, config.ssh.port, 2000) }.getOrDefault(false)
-        items.add(
-            DoctorItem(
-                "SSH host reachable",
-                if (hostReachable) "OK" else "WARN",
-                if (hostReachable) "tcp connect ok" else "unable to connect"
+        if (state != ServiceState.STOPPED) {
+            items.add(DoctorItem("SSH host reachable", "INFO", "skipped while running"))
+        } else {
+            val hostReachable = runCatching { canConnect(config.ssh.host, config.ssh.port, 2000) }.getOrDefault(false)
+            items.add(
+                DoctorItem(
+                    "SSH host reachable",
+                    if (hostReachable) "OK" else "WARN",
+                    if (hostReachable) "tcp connect ok" else "unable to connect"
+                )
             )
-        )
+        }
 
         val knownHostsFile = File(context.filesDir, "known_hosts")
         items.add(
@@ -96,4 +107,5 @@ object DoctorChecks {
             return true
         }
     }
+
 }

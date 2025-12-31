@@ -62,6 +62,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.rpa.android.ui.theme.RpaTheme
+import java.time.Instant
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -141,7 +144,7 @@ fun RpaApp() {
     val metricsSnapshot by MetricsStore.metrics.collectAsState()
     val metrics = metricsSnapshot.toItems()
     val doctorItems = remember { mutableStateOf<List<DoctorItem>>(emptyList()) }
-    val snapshot = remember(serviceStatus) {
+    val snapshot = remember(serviceStatus, metricsSnapshot) {
         StatusSnapshot(
             state = when (serviceStatus.state) {
                 ServiceState.RUNNING -> TunnelState.RUNNING
@@ -152,7 +155,7 @@ fun RpaApp() {
             lastExit = metricsSnapshot.lastExit,
             lastClass = metricsSnapshot.lastClass,
             lastTrigger = metricsSnapshot.lastTrigger,
-            lastSuccessUtc = metricsSnapshot.lastSuccessUnix?.toString() ?: "-",
+            lastSuccessUtc = formatUtc(metricsSnapshot.lastSuccessUnix),
             tcpCheck = "-",
             tcpCheckError = ""
         )
@@ -166,7 +169,7 @@ fun RpaApp() {
     }
 
     LaunchedEffect(serviceStatus.state, metricsSnapshot.lastExit) {
-        doctorItems.value = DoctorChecks.run(context)
+        doctorItems.value = DoctorChecks.run(context, serviceStatus.state)
     }
 
     LaunchedEffect(Unit) {
@@ -263,7 +266,7 @@ fun HomeScreen(
         }
         item {
             ActionRow(
-                isRunning = state.snapshot.state == TunnelState.RUNNING,
+                state = state.snapshot.state,
                 onStart = onStart,
                 onStop = onStop
             )
@@ -313,18 +316,22 @@ fun StatusHeader(snapshot: StatusSnapshot) {
 }
 
 @Composable
-fun ActionRow(isRunning: Boolean, onStart: () -> Unit, onStop: () -> Unit) {
+fun ActionRow(state: TunnelState, onStart: () -> Unit, onStop: () -> Unit) {
+    val isRunning = state == TunnelState.RUNNING
+    val isConnecting = state == TunnelState.CONNECTING
+    val canStart = state == TunnelState.STOPPED
+    val canStop = isRunning || isConnecting
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Button(
             onClick = onStart,
-            enabled = !isRunning,
+            enabled = canStart,
             modifier = Modifier.weight(1f)
         ) {
             Text(text = "Start")
         }
         Button(
             onClick = onStop,
-            enabled = isRunning,
+            enabled = canStop,
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
             modifier = Modifier.weight(1f)
         ) {
@@ -362,6 +369,14 @@ fun DetailRow(label: String, value: String) {
         Text(text = label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
         Text(text = value, style = MaterialTheme.typography.bodyMedium)
     }
+}
+
+private val utcFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss 'UTC'")
+    .withZone(ZoneOffset.UTC)
+
+private fun formatUtc(value: Long?): String {
+    if (value == null) return "-"
+    return utcFormatter.format(Instant.ofEpochSecond(value))
 }
 
 @Composable
