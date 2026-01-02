@@ -1,10 +1,12 @@
 package com.rpa.android.core
 
+import android.content.Context
 import com.rpa.android.data.LogStore
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -37,6 +39,14 @@ object ServiceEvents {
         val next = (_logs.value + line).takeLast(MAX_LOGS)
         _logs.value = next
         LogStore.append("${line.timestamp}|${line.level}|${line.message}")
+    }
+
+    fun loadLogPage(offsetFromEnd: Int, pageSize: Int): List<LogLine> {
+        return LogStore.loadPage(offsetFromEnd, pageSize).mapNotNull { parseLine(it) }
+    }
+
+    fun exportLogs(context: Context): File? {
+        return LogStore.exportToCache(context)
     }
 
     private fun parseLine(raw: String): LogLine? {

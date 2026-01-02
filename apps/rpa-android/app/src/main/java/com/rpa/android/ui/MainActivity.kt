@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -46,6 +47,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -136,7 +138,6 @@ fun RpaApp() {
         pendingStart = false
     }
     val serviceStatus by ServiceEvents.status.collectAsState()
-    val logs by ServiceEvents.logs.collectAsState()
     val metricsSnapshot by MetricsStore.metrics.collectAsState()
     val metrics = metricsSnapshot.toItems()
     val doctorItems = remember { mutableStateOf<List<DoctorItem>>(emptyList()) }
@@ -207,7 +208,6 @@ fun RpaApp() {
                     padding,
                     AppUiState(
                         snapshot = snapshot,
-                        logs = logs,
                         metrics = metrics,
                         doctorItems = doctorItems.value,
                         configText = "",
@@ -223,7 +223,7 @@ fun RpaApp() {
                     },
                     onStop = { RpaServiceController.stop(context) }
                 )
-                AppTab.Logs -> LogsScreen(padding, logs)
+                AppTab.Logs -> LogsScreen(padding)
                 AppTab.Config -> ConfigScreen(padding)
                 AppTab.Metrics -> MetricsScreen(padding, metrics)
                 AppTab.Doctor -> DoctorScreen(padding, doctorItems.value)
@@ -389,12 +389,59 @@ fun QuickNotes(notes: List<String>) {
 
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
-fun LogsScreen(padding: PaddingValues, logs: List<LogLine>) {
+fun LogsScreen(padding: PaddingValues) {
     val context = LocalContext.current
     var query by remember { mutableStateOf("") }
-    val filtered = logs
-        .filter { it.message.contains(query, ignoreCase = true) }
-        .asReversed()
+    val listState = rememberLazyListState()
+    val pageSize = 200
+    var loadedLogs by remember { mutableStateOf<List<LogLine>>(emptyList()) }
+    var loadedCountFromEnd by remember { mutableStateOf(0) }
+    var isLoadingMore by remember { mutableStateOf(false) }
+    var canLoadMore by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        val initial = ServiceEvents.loadLogPage(0, pageSize)
+        loadedLogs = initial
+        loadedCountFromEnd = initial.size
+        if (initial.size < pageSize) {
+            canLoadMore = false
+        }
+        ServiceEvents.events.collect { line ->
+            loadedLogs = loadedLogs + line
+            loadedCountFromEnd += 1
+        }
+    }
+
+    suspend fun loadMore() {
+        if (isLoadingMore || !canLoadMore) {
+            return
+        }
+        isLoadingMore = true
+        val page = ServiceEvents.loadLogPage(loadedCountFromEnd, pageSize)
+        if (page.isEmpty()) {
+            canLoadMore = false
+        } else {
+            loadedLogs = page + loadedLogs
+            loadedCountFromEnd += page.size
+        }
+        isLoadingMore = false
+    }
+
+    val filtered = remember(loadedLogs, query) {
+        loadedLogs.filter { it.message.contains(query, ignoreCase = true) }.asReversed()
+    }
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            lastVisible >= (filtered.size - 5).coerceAtLeast(0)
+        }
+    }
+
+    LaunchedEffect(shouldLoadMore, canLoadMore, isLoadingMore, query) {
+        if (query.isBlank() && shouldLoadMore) {
+            loadMore()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -410,7 +457,34 @@ fun LogsScreen(padding: PaddingValues, logs: List<LogLine>) {
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(modifier = Modifier.height(12.dp))
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(
+                onClick = {
+                    val exportFile = ServiceEvents.exportLogs(context)
+                    if (exportFile == null) {
+                        ShareHelper.toast(context, "No log file")
+                    } else {
+                        ShareHelper.shareFile(context, "rpa logs", exportFile)
+                    }
+                },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(text = "Export logs")
+            }
+            Button(
+                onClick = { ShareHelper.copy(context, "rpa logs", filtered.joinToString("\n") {
+                    "${it.timestamp}  ${it.level}  ${it.message}"
+                }) },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(text = "Copy shown")
+            }
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        LazyColumn(
+            state = listState,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             items(filtered) { log ->
                 val line = "${log.timestamp}  ${log.level}  ${log.message}"
                 Card(
@@ -426,6 +500,15 @@ fun LogsScreen(padding: PaddingValues, logs: List<LogLine>) {
                         Text(text = "${log.timestamp}  ${log.level}", style = MaterialTheme.typography.labelSmall)
                         Text(text = log.message, style = MaterialTheme.typography.bodyMedium)
                     }
+                }
+            }
+            if (isLoadingMore) {
+                item {
+                    Text(
+                        text = "Loading older logs...",
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
                 }
             }
         }
@@ -655,7 +738,6 @@ fun AppBackground(content: @Composable () -> Unit) {
 
 data class AppUiState(
     val snapshot: StatusSnapshot,
-    val logs: List<LogLine>,
     val metrics: List<MetricItem>,
     val doctorItems: List<DoctorItem>,
     val configText: String,

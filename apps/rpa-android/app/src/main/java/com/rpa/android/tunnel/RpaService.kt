@@ -59,9 +59,14 @@ class RpaService : Service() {
             statusCallback = { state, detail -> updateStatus(state, detail) },
             logCallback = { level, message -> ServiceEvents.log(level, message) }
         )
-        networkMonitor = NetworkMonitor(this) { reason ->
-            ServiceEvents.log("INFO", reason)
-            tunnelManager.requestRestart("network change")
+        networkMonitor = NetworkMonitor(this) { event ->
+            ServiceEvents.log("INFO", event.message)
+            when (event.type) {
+                NetworkEventType.LOST -> tunnelManager.requestRestart("network lost")
+                NetworkEventType.DEGRADED -> tunnelManager.requestRestart("network degraded")
+                NetworkEventType.AVAILABLE,
+                NetworkEventType.CHANGED -> Unit
+            }
         }
         networkMonitor.register()
     }
